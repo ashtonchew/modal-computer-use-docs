@@ -1,7 +1,7 @@
 ---
 title: "Integrate AI Models with Desktop Control Using Adapters"
 sidebarTitle: "Overview"
-description: "modal-computer-use's provider adapters translate OpenAI and Anthropic computer-use actions into desktop operations, with coordinate-space translation and policy hooks."
+description: "Provider adapters convert OpenAI and Anthropic computer-use actions to desktop operations with coordinate-space translation and policy hooks."
 ---
 
 Provider adapters are the bridge between AI model output and your desktop sandbox. When OpenAI's Responses API or Anthropic's Messages API returns a computer-use action, the adapter translates that provider-specific JSON payload into the native `modal-computer-use` action schema and dispatches it to the running daemon. Adapters do **not** call any provider API — they are pure translation and execution layers that sit between your model loop and the desktop.
@@ -108,6 +108,7 @@ If the hook returns anything other than `ActionDecision(decision="allow")`, the 
 | `"allow"` | Execute the action normally. |
 | `"deny"` | Raise `UnsupportedActionError` immediately. |
 | `"ask_user"` | Raise `UnsupportedActionError` with the provided `reason`. Your loop should surface the reason to the user. |
+| `"handoff"` | Raise `UnsupportedActionError`. Use when the action should be delegated to a human operator rather than denied silently. |
 
 For **atomic response-level preflight** — where you want to check every action in a response before dispatching any of them — call the hook over every normalized action tree before dispatching the first call. The OpenAI loop example demonstrates this pattern.
 
@@ -154,6 +155,7 @@ metadata = openai_screenshot_metadata(post_batch_screenshot)
 ```python
 from modal_computer_use.adapters.anthropic import (
     anthropic_tool_result,
+    anthropic_screenshot_content,
     anthropic_screenshot_metadata,
 )
 
@@ -163,15 +165,18 @@ tool_result = anthropic_tool_result(
     result=screenshot,
 )
 
+# Build a bare image content block (for multi-part tool results, e.g. computer_batch)
+image_block = anthropic_screenshot_content(screenshot)
+
 # Record safe metadata (no image bytes or base64) for tracing
 metadata = anthropic_screenshot_metadata(screenshot)
 ```
 
 `openai_screenshot_metadata()` and `anthropic_screenshot_metadata()` both return a dict containing dimensions, format, SHA-256, artifact URI, capture time, and coordinate space — but **never** raw image bytes or base64 data.
 
-## Trace and redaction
+## Tracing and sensitive data
 
-When daemon action tracing is enabled, the adapter promotes redacted provider data to `TraceEntry.provider_action` alongside `TraceEntry.normalized_action` (the native action that was actually executed). Typed text and other sensitive provider fields are replaced with redaction metadata before they can be written to trace NDJSON. Provider provenance in action metadata is safe to pass to trace writers.
+Adapters never write sensitive data to traces. Typed text and other sensitive provider fields are automatically redacted before they reach any trace output. The normalized native action (what actually executed on the desktop) is recorded separately from the original provider action. This means your trace logs are safe to store and review without risk of leaking passwords, typed text, or other sensitive input.
 
 ## Next steps
 

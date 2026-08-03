@@ -1,7 +1,7 @@
 ---
-title: "Run Action Batches with Timeouts and Idempotency"
+title: "Run Desktop Action Batches with Timeouts and Idempotency"
 sidebarTitle: "Action Batches"
-description: "Execute ordered desktop action sequences using computer.actions.run(), with per-action timeouts, idempotency keys, continue_on_error, and trailing screenshots."
+description: "Execute ordered desktop action sequences with computer.actions.run(): per-action timeouts, idempotency keys, continue_on_error, and trailing screenshots."
 ---
 
 `computer.actions.run()` is the primary API for executing ordered sequences of desktop actions — mouse moves, clicks, keystrokes, scrolls, and more — in a single request. The daemon validates the full batch before execution begins, respects per-action and whole-batch timeouts, and can capture a trailing screenshot in the same round-trip. This guide covers every aspect of the batch action API, from the available action types through idempotency, error handling, and budget accounting.
@@ -118,7 +118,7 @@ A whole-batch duration cap (`COMPUTER_USE_MAX_BATCH_DURATION_MS`, default 30 000
 
 ## Idempotency keys
 
-Pass an `Idempotency-Key` header to make a batch replay-safe. If you submit the same key again, the daemon returns the original complete batch result without re-executing any actions, incrementing budgets, or duplicating trace or artifact writes:
+Pass `idempotency_key=` to `computer.actions.run()` to make a batch replay-safe. The SDK sends this value as the `Idempotency-Key` HTTP header. If you submit the same key again, the daemon returns the original complete batch result without re-executing any actions, incrementing budgets, or duplicating trace or artifact writes:
 
 ```python
 import uuid

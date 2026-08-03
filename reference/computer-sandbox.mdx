@@ -561,6 +561,15 @@ Every `ComputerSandbox` instance exposes the following typed namespaces:
     ```
     Exiting only detaches the local handle and closes the HTTP client. The remote sandbox continues running.
   </Tab>
+  <Tab title="local() — direct connection">
+    ```python
+    with ComputerSandbox.local(base_url="http://127.0.0.1:8080", token="dev") as computer:
+        computer.wait_until_ready()
+        computer.mouse.click(320, 240)
+    # On exit: client.close() only — no sandbox to terminate or detach
+    ```
+    `local()` mode connects directly to an already-running daemon and never owns a Modal sandbox. Exiting closes only the HTTP connection.
+  </Tab>
   <Tab title="explicit detach() — transfers ownership">
     ```python
     with ComputerSandbox.create(config=ComputerConfig()) as computer:

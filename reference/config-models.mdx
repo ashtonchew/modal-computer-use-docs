@@ -1,7 +1,7 @@
 ---
-title: "ComputerConfig and Nested Configuration Models"
+title: "ComputerConfig and Nested Configuration Model Reference"
 sidebarTitle: "Config Models"
-description: "Reference for ComputerConfig and all nested models: ResourceConfig, BrowserConfig, NetworkConfig, StorageConfig, ActionConfig, BudgetConfig, RuntimeConfig, DesktopConfig, ImageConfig."
+description: "Reference for ComputerConfig and all 9 nested models. Pass ComputerConfig to ComputerSandbox.create() to configure a modal-computer-use desktop session."
 ---
 
 `ComputerConfig` is the single entry point for configuring a modal-computer-use desktop. You pass it to `ComputerSandbox.create()` or `AsyncComputerSandbox.create()`, and the SDK maps each field to the correct Modal orchestration argument or daemon environment variable. All nested models reject unknown keys, so typos fail at construction time rather than silently applying wrong defaults. Nested models can be supplied either as model instances or as plain Python dictionaries.

@@ -1,7 +1,7 @@
 ---
-title: "Input Namespaces: Mouse, Keyboard, and Clipboard"
+title: "Input Namespaces: Mouse, Keyboard, Clipboard, and Release"
 sidebarTitle: "Input"
-description: "Reference for computer.mouse, computer.keyboard, and computer.clipboard namespaces in modal-computer-use, covering every method, parameter, and return type."
+description: "Reference for computer.mouse, computer.keyboard, computer.clipboard, and computer.input in modal-computer-use: methods, parameters, and return types."
 ---
 
 The `computer.mouse`, `computer.keyboard`, `computer.clipboard`, and `computer.input` namespaces give you precise, low-level control over all user-input surfaces in the Sandbox desktop. Mouse methods emit XTest pointer events; keyboard methods use the configured input backend (XTest/XKB by default, with `xdotool` as a legacy fallback); clipboard methods read and write the X clipboard directly. Every mutating call holds the daemon's input lock, so batched actions and direct calls do not race.

@@ -1,5 +1,5 @@
 ---
-title: "modal-computer-use Environment Variable Reference"
+title: "modal-computer-use Environment Variables Reference"
 sidebarTitle: "Environment Variables"
 description: "Reference for all COMPUTER_USE_* environment variables that configure the modal-computer-use daemon process when deploying without the Python SDK."
 ---
@@ -130,6 +130,3 @@ These variables enforce per-session consumption limits and enable optional OpenT
 | `COMPUTER_USE_MAX_IDLE_SECONDS` | unset | Maximum seconds since the last budget-counted activity. Unset or empty means unlimited. |
 | `COMPUTER_USE_OTEL_ENABLED` | `false` | Enable bounded OpenTelemetry spans. Requires the optional `opentelemetry-api` package. Disabled mode does not require it. |
 
-<Note>
-SDK-generated runner variables (`COMPUTER_USE_DAEMON_BASE_URL`, `COMPUTER_USE_DAEMON_TOKEN`, `COMPUTER_USE_DAEMON_RUNNER_PATH`, `COMPUTER_USE_TARGET_SANDBOX_ID`) are transport variables for SDK-started helper processes. They are reserved by `modal_daemon_env`; a caller-supplied runner environment cannot override them. Treat all of them as secret-bearing.
-</Note>

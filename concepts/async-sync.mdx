@@ -1,7 +1,7 @@
 ---
 title: "Sync vs. Async Interfaces in modal-computer-use"
 sidebarTitle: "Sync vs. Async"
-description: "Choose between ComputerSandbox, AsyncComputerSandbox, and AsyncDaemonClient based on whether your application is synchronous, async, or connecting to an existing daemon."
+description: "Pick the right client — ComputerSandbox, AsyncComputerSandbox, or AsyncDaemonClient — based on whether your code is sync, async, or daemon-only."
 ---
 
 `modal-computer-use` ships three primary client interfaces. They expose identical desktop-control namespaces — the same `computer.mouse`, `computer.keyboard`, `computer.screenshots`, and so on — but differ in whether they block your thread, whether they provision Modal infrastructure, and how they handle Sandbox lifecycle ownership. Choosing the right interface up front saves you from refactoring later.
@@ -263,7 +263,7 @@ This is the right choice when:
 
 ## HotSessionClient — persistent WebSocket action streams
 
-For high-frequency action loops where per-request HTTP overhead matters, `HotSessionClient` (sync) and `AsyncHotSessionClient` (async) keep a persistent WebSocket open to the daemon. Actions are sent over that single connection, which eliminates TCP connection setup on every call.
+For high-frequency action loops where per-request HTTP overhead matters, `HotSessionClient` (sync) and `AsyncHotSessionClient` (async) keep a persistent WebSocket open to the daemon. Actions are sent over that single connection as batches via `run_actions()`, which eliminates TCP connection setup on every call.
 
 ```python
 from modal_computer_use import ComputerConfig, ComputerSandbox
@@ -272,8 +272,10 @@ with ComputerSandbox.create(config=ComputerConfig()) as computer:
     # Open a persistent WebSocket session for the inner loop
     with computer.hot_session() as hot:
         for i in range(100):
-            hot.mouse.click(100 + i, 200)
-            hot.keyboard.type(f"Step {i}\n")
+            hot.run_actions([
+                {"type": "click", "x": 100 + i, "y": 200},
+                {"type": "type", "text": f"Step {i}\n"},
+            ])
 ```
 
 ```python
@@ -284,8 +286,10 @@ async def main() -> None:
     async with AsyncComputerSandbox.create(config=ComputerConfig()) as computer:
         async with computer.hot_session() as hot:
             for i in range(100):
-                await hot.mouse.click(100 + i, 200)
-                await hot.keyboard.type(f"Step {i}\n")
+                await hot.run_actions([
+                    {"type": "click", "x": 100 + i, "y": 200},
+                    {"type": "type", "text": f"Step {i}\n"},
+                ])
 
 asyncio.run(main())
 ```

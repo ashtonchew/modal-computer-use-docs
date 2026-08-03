@@ -108,7 +108,7 @@ async def run_agent():
             await computer.actions.run_async(actions)
 ```
 
-Native async keeps the event loop free during Modal and daemon I/O. It also provides cancellation-aware cleanup. The `borrow_async()` path runs lease heartbeat renewal on a dedicated private thread so ordinary async work — model calls, screenshots, other desktop tasks — never starves the lease.
+Native async keeps the event loop free during Modal and daemon I/O. It also provides cancellation-aware cleanup. Lease state is maintained automatically while the `borrow_async()` context is open, so ordinary async work — model calls, screenshots, other desktop tasks — remains responsive without any extra configuration.
 
 <Note>
   Use `asyncio.to_thread()` only as a bridge for blocking I/O from legacy libraries. It does not make CPU-bound or GIL-holding work safe, and it does not make a blocked event loop responsive.
@@ -192,11 +192,19 @@ config = ComputerConfig(
 
 This exposes the daemon port through Modal `h2_ports`, starts the daemon under Hypercorn, and uses an `httpx` HTTP/2 client. HTTP/2 multiplexes multiple requests over one connection, reducing connection overhead for bursty action loops. HTTP/1.1 remains the SDK default for broadest compatibility; switch to HTTP/2 only after benchmarking confirms a benefit on your workload.
 
-## Understand Receipt Durability Cost
+## Understand Per-Action Latency Sources
 
-Each leased mutation crosses one SQLite WAL commit with `synchronous=FULL` before the daemon dispatches the mutation. This is a surviving-target-filesystem guarantee — it ensures that no mutation is dispatched without a surviving `IN_PROGRESS` receipt — but it adds a small per-action cost on every write path.
+When you measure warm-path action latency, it is worth knowing where time actually goes so you target the right optimizations:
 
-This cost is paid only at the safety boundary. Terminal receipt bookkeeping uses the weaker `synchronous=NORMAL`. You cannot eliminate the `FULL` sync without removing the safety guarantee. If per-action latency is dominated by this cost in your environment, measure it with alternating `FULL` and `NORMAL` pre-dispatch transactions on the same filesystem before drawing conclusions — and never move the SQLite WAL to a Modal Volume or a network filesystem.
+- **Network transport** dominates for external callers. Placing your caller near the sandbox (see [Place the Caller Near the Sandbox](#place-the-caller-near-the-sandbox)) removes the largest single source of latency.
+- **Screenshot encoding** is the second major cost on hot loops. Use binary routes and fused action-and-screenshot requests to avoid base64/JSON overhead.
+- **Action dispatch** inside the daemon is typically sub-millisecond once the sandbox is warm. Batching actions into a single request further reduces round-trip count.
+
+If measured latency is still higher than expected after placing the caller nearby and enabling HTTP/2:
+
+1. Profile the breakdown with `computer-use benchmark modal-colocated-client` to attribute time between transport, daemon execution, and screenshot encoding.
+2. Check that your agent loop is not taking intermediate screenshots unnecessarily — every screenshot is a full encode-and-transfer cycle.
+3. Consider the observation stream for tight loops that need change detection rather than polling.
 
 ## Warm Capacity
 

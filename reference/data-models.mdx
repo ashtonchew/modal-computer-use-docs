@@ -1,7 +1,7 @@
 ---
 title: "Data Models and Return Types in modal-computer-use"
 sidebarTitle: "Data Models"
-description: "Reference for all data model classes returned by modal-computer-use operations: Screenshot, Recording, ArtifactInfo, ActionBatchResult, ComputerStatus, and more."
+description: "Reference for all Pydantic model classes returned by modal-computer-use: Screenshot, ActionBatchResult, ComputerSessionHandle, WarmPoolPolicy, and more."
 ---
 
 `modal-computer-use` returns strongly-typed Pydantic models from every SDK operation. All public models are exported directly from the top-level `modal_computer_use` package, so you can import them alongside the client classes you already use. This page documents every return type grouped by the area of the SDK that produces it — screenshots, actions, sessions, artifacts, sandbox management, and warm-pool capacity.
@@ -1077,6 +1077,14 @@ Latency and outcome metrics for one warm pool claim attempt.
   Time from claim start to successful daemon authentication.
 </ResponseField>
 
+<ResponseField name="requested_region" type="str | None">
+  The Modal region requested for the claimed slot, if specified.
+</ResponseField>
+
+<ResponseField name="actual_region" type="str | None">
+  The Modal region where the claimed sandbox actually landed, if reported.
+</ResponseField>
+
 <ResponseField name="miss_reason" type="str | None">
   Machine-readable reason for a cache miss (`"pool_empty"`, `"config_mismatch"`, `"near_expiry"`, etc.).
 </ResponseField>
@@ -1105,6 +1113,10 @@ Returned after filling a warm pool to its target capacity.
 
 <ResponseField name="config_identity" type="str" required>
   Config identity used for the created slots.
+</ResponseField>
+
+<ResponseField name="requested_region" type="str | None">
+  The Modal region requested for the created slots, if specified.
 </ResponseField>
 
 <ResponseField name="configured_capacity" type="int" required>

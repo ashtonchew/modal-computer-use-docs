@@ -235,7 +235,9 @@ Entries that fail frame validation are rejected as pool candidates. If all candi
 
 ## Cost Estimation
 
-`estimate_warm_idle_cost(entry, claimed_at=..., configured_pool_size=...)` computes the approximate cost of keeping a warm sandbox idle from its `ready_at` timestamp until it was claimed. This uses public Modal rates and the sandbox's CPU and memory metadata:
+### Per-Entry Cost: estimate_warm_idle_cost
+
+`estimate_warm_idle_cost(entry, claimed_at=..., configured_pool_size=...)` computes the approximate cost of keeping a single warm sandbox idle from its `ready_at` timestamp until it was claimed. This uses public Modal rates and the sandbox's CPU and memory metadata:
 
 ```python
 from datetime import UTC, datetime
@@ -251,6 +253,27 @@ cost = estimate_warm_idle_cost(
 ```
 
 The estimate returns `status="partial"` when CPU or memory metadata is missing. Treat all cost estimates as approximate public-rate context, not billing truth.
+
+### Full Pool Cost: estimate_pool_idle_cost
+
+`estimate_pool_idle_cost(entries, observed_at=..., configured_pool_size=...)` aggregates idle cost across all warm entries currently in the pool. Use this to understand the total running cost of keeping your pool warm at a given point in time:
+
+```python
+from datetime import UTC, datetime
+from modal_computer_use.latency import estimate_pool_idle_cost
+
+fill = manager.fill_warm_pool(config=config, policy=policy)
+pool_cost = estimate_pool_idle_cost(
+    entries=list(fill.entries),
+    observed_at=datetime.now(UTC),
+    configured_pool_size=policy.capacity,
+)
+# pool_cost["estimated_cost"]["total"] → aggregate USD across all entries
+# pool_cost["estimated_cost"]["status"] → "estimated" if all entries have complete metadata, else "partial"
+# pool_cost["observed_ready_slots"] → how many entries were included
+```
+
+The aggregate `status` is `"estimated"` only when all entries have complete CPU and memory metadata **and** the number of observed entries equals `configured_pool_size`. Any missing metadata or a partially filled pool returns `"partial"`.
 
 ## Error Handling
 
@@ -274,6 +297,8 @@ The following is the complete warm pool example from the SDK repository:
 
 ```python
 """Provision and claim bounded, one-shot Modal warm capacity."""
+
+from __future__ import annotations
 
 import os
 
@@ -299,7 +324,6 @@ def main() -> None:
     region = os.environ.get("MODAL_COMPUTER_USE_REGION", "").strip()
     if not region:
         raise RuntimeError("set MODAL_COMPUTER_USE_REGION from a current region measurement")
-
     manager = ComputerSandboxManager()
     policy = WarmPoolPolicy(
         pool_name="interactive-firefox",
@@ -307,26 +331,27 @@ def main() -> None:
         min_remaining_seconds=300,
     )
     config = warm_config(region=region)
-
-    # Fill the pool before requests arrive
     fill = manager.fill_warm_pool(config=config, policy=policy)
-    print({
-        "configured_capacity": fill.configured_capacity,
-        "existing_count": fill.existing_count,
-        "created_count": fill.created_count,
-    })
+    print(
+        {
+            "configured_capacity": fill.configured_capacity,
+            "existing_count": fill.existing_count,
+            "created_count": fill.created_count,
+        }
+    )
 
-    # Claim one desktop when a request arrives
     claim = manager.claim_warm_pool(config=config, policy=policy)
     try:
-        print({
-            "pool_hit": claim.metrics.hit,
-            "cold_fallback": claim.metrics.cold_fallback,
-            "claim_elapsed_ms": claim.metrics.claim_elapsed_ms,
-            "remaining_lifetime_seconds": claim.metrics.remaining_lifetime_seconds,
-            "cost_accounting": claim.metrics.cost_accounting,
-        })
-        # Run your agent loop on claim.computer
+        print(
+            {
+                "pool_hit": claim.metrics.hit,
+                "cold_fallback": claim.metrics.cold_fallback,
+                "claim_elapsed_ms": claim.metrics.claim_elapsed_ms,
+                "remaining_lifetime_seconds": claim.metrics.remaining_lifetime_seconds,
+                "cost_accounting": claim.metrics.cost_accounting,
+            }
+        )
+        # Keep the action and frame loop on claim.computer. Do not requeue this Sandbox.
     finally:
         claim.close()
 

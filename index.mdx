@@ -33,8 +33,8 @@ description: "Turn a Modal Sandbox into a remotely controllable Linux desktop. C
   <Card title="Capture Observations" icon="camera" href="/guides/screenshots-recordings">
     Take full-screen or region screenshots, stream frames over a WebSocket, and record video.
   </Card>
-  <Card title="Run Commands" icon="terminal" href="/concepts/namespaces">
-    Execute shell commands and read process logs directly from the desktop.
+  <Card title="Run Commands" icon="terminal" href="/guides/action-batches">
+    Execute shell commands, batch desktop actions, and read process logs directly from the desktop.
   </Card>
   <Card title="Manage Files" icon="folder" href="/guides/artifacts-storage">
     Upload, download, and persist artifacts. Sync to a Modal Volume for durable storage.
@@ -58,7 +58,12 @@ description: "Turn a Modal Sandbox into a remotely controllable Linux desktop. C
     Use `ComputerSandbox.create()` to spin up a Modal Sandbox with a full Linux desktop:
 
     ```python quickstart.py
-    from modal_computer_use import ComputerConfig, ComputerSandbox, BrowserConfig, ResourceConfig
+    from modal_computer_use import (
+        BrowserConfig,
+        ComputerConfig,
+        ComputerSandbox,
+        ResourceConfig,
+    )
 
     config = ComputerConfig(
         resources=ResourceConfig(profile="browser"),
@@ -67,8 +72,10 @@ description: "Turn a Modal Sandbox into a remotely controllable Linux desktop. C
 
     with ComputerSandbox.create(config=config) as computer:
         computer.browser.open_url("https://example.com")
+        computer.mouse.move(320, 240)
         screenshot = computer.screenshots.full()
         screenshot.save("screenshot.png")
+        print(screenshot.width, screenshot.height, screenshot.sha256)
     ```
   </Step>
   <Step title="Run your script">

@@ -1,7 +1,7 @@
 ---
 title: "Error Types and Exception Handling in modal-computer-use"
 sidebarTitle: "Error Types"
-description: "Reference for all exception types raised by modal-computer-use, with causes, HTTP status codes, and recovery guidance for each error class."
+description: "Reference for all exception types raised by modal-computer-use, with causes, remediation steps, and recovery guidance for each error class."
 ---
 
 Every exception raised by `modal-computer-use` inherits from `ComputerUseError`. This hierarchy lets you catch all SDK errors with a single `except ComputerUseError` clause, or handle specific failure modes precisely. The sections below group errors by the layer where they originate — sandbox and session management, individual operations, and configuration — so you can map each exception to the part of your call stack most likely to encounter it.
@@ -304,17 +304,9 @@ Both `BrowserReadinessError` and `FrameValidationError` are designed to be compa
 
 ```
 ComputerUseError
-├── ConfigurationError
-│   └── ConfigConflictError
-├── AuthenticationError
+├── ConfigConflictError
 ├── BrowserReadinessError          (also RuntimeError)
 ├── FrameValidationError           (also ValueError)
-├── DaemonHTTPError
-├── UnsupportedActionError
-├── ActionValidationError
-├── ArtifactPathError              (also ValueError)
-├── BudgetExceededError
-├── ModalNotInstalledError
 ├── SandboxUnavailableError
 │   └── SandboxAmbiguousError
 └── SessionBorrowError

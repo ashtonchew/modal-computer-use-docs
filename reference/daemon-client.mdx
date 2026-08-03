@@ -1,5 +1,5 @@
 ---
-title: "DaemonClient and AsyncDaemonClient Reference"
+title: "DaemonClient and AsyncDaemonClient Reference Guide"
 sidebarTitle: "DaemonClient"
 description: "DaemonClient and AsyncDaemonClient connect to an already-running modal-computer-use daemon, providing the full namespace API without Modal provisioning."
 ---
@@ -243,9 +243,9 @@ asyncio.run(main())
 
 ---
 
-## `ObservationClient` / `AsyncObservationClient`
+## `AsyncObservationClient`
 
-Observation streams deliver a continuous frame sequence over WebSocket. Use them to observe the desktop state between or after actions without polling for individual screenshots.
+Observation streams deliver a continuous frame sequence over WebSocket. Use them to observe the desktop state between or after actions without polling for individual screenshots. `AsyncObservationClient` is accessed via `AsyncDaemonClient.observation_stream()`. For synchronous observation streams, use `ComputerSandbox.observation_stream()` which returns a `ObservationClient`.
 
 ### Async
 

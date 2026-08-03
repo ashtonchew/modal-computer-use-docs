@@ -1,7 +1,7 @@
 ---
-title: "AsyncComputerSandbox: Async Desktop Sandbox Class"
+title: "AsyncComputerSandbox: Native Async Desktop Sandbox"
 sidebarTitle: "AsyncComputerSandbox"
-description: "AsyncComputerSandbox provides native async Modal creation, attachment, and named acquisition for desktop sandboxes, using Modal's .aio operations throughout."
+description: "AsyncComputerSandbox provides native async Modal creation, attachment, and named sandbox acquisition, yielding a ready desktop on async with entry."
 ---
 
 `AsyncComputerSandbox` is the native async counterpart to `ComputerSandbox`. It provisions, attaches to, and controls Modal Linux desktop sandboxes without blocking the event loop. All three construction methods — `create()`, `attach()`, and `attach_or_create()` — return lazy async context managers that perform no Modal work until you enter them with `async with`. The sandbox is ready to receive actions the moment the context yields. The same typed namespaces available on `ComputerSandbox` (`mouse`, `keyboard`, `screenshots`, etc.) are exposed directly on the instance, and all operations are `await`-able throughout.

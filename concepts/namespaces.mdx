@@ -1,7 +1,7 @@
 ---
 title: "Desktop Control Namespaces in modal-computer-use"
 sidebarTitle: "Namespaces"
-description: "Every desktop operation in modal-computer-use is organized into typed namespaces on the computer object — mouse, keyboard, browser, screenshots, and more."
+description: "Desktop operations in modal-computer-use are grouped into typed namespaces on the computer object: mouse, keyboard, browser, screenshots, and more."
 ---
 
 Once you have a `computer` object — from `ComputerSandbox`, `AsyncComputerSandbox`, or `AsyncDaemonClient` — every desktop operation you can perform lives in a typed namespace attached to it. Instead of a flat list of functions, the SDK groups related operations together: `computer.mouse` for pointer work, `computer.keyboard` for text and key input, `computer.browser` for URL navigation, and so on. This organization makes it easy to discover capabilities through autocomplete and keeps your code readable at a glance.

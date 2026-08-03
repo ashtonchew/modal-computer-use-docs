@@ -14,7 +14,7 @@ ComputerConfig
 ├── runtime      → RuntimeConfig       (timeout, idle timeout, Modal region)
 ├── resources    → ResourceConfig      (profile, CPU, memory, GPU)
 ├── image        → ImageConfig         (inline vs. named image, revision)
-├── network      → NetworkConfig       (block_all, HTTP version, CIDR allowlists)
+├── network      → NetworkConfig       (block_all, HTTP version, outbound/inbound CIDR allowlists)
 ├── storage      → StorageConfig       (artifact dir, recordings dir, persistence)
 ├── browser      → BrowserConfig|None  (kind, prewarm, launch args, GPU mode)
 ├── actions      → ActionConfig        (timeouts, rate limits, input backend)
@@ -160,14 +160,14 @@ You can also pass an explicit `image=` object directly to `ComputerSandbox.creat
 
 ## NetworkConfig
 
-Controls outbound network access, ingress tunneling, and HTTP version.
+Controls outbound and inbound network access, ingress tunneling, and HTTP version.
 
 <ParamField path="network.block_all" type="bool" default="false">
   When `true`, blocks all outbound network access. Cannot be combined with any allowlist. Requires `ingress="connect"` with VNC disabled.
 </ParamField>
 
 <ParamField path="network.daemon_http_version" type="str" default='"1.1"'>
-  HTTP version used for the daemon's internal transport. `"1.1"` uses Uvicorn/HTTP 1.1. `"2"` uses cleartext HTTP/2 (`h2c`) inside the Sandbox via Hypercorn.
+  HTTP version used for the SDK-to-daemon connection inside the Sandbox. `"1.1"` uses HTTP/1.1. `"2"` uses cleartext HTTP/2 (`h2c`).
 </ParamField>
 
 <ParamField path="network.outbound_cidr_allowlist" type="list[str] | None" default="None">
@@ -176,6 +176,10 @@ Controls outbound network access, ingress tunneling, and HTTP version.
 
 <ParamField path="network.outbound_domain_allowlist" type="list[str] | None" default="None">
   List of domain strings restricting outbound network access to those domains. Passed to Modal.
+</ParamField>
+
+<ParamField path="network.inbound_cidr_allowlist" type="list[str] | None" default="None">
+  List of CIDR strings restricting inbound network access to those ranges. Passed to Modal.
 </ParamField>
 
 ```python

@@ -1,5 +1,5 @@
 ---
-title: "Hand Off a Desktop Session to a Modal Function"
+title: "Hand Off a Desktop Session to a Deployed Modal Function"
 sidebarTitle: "Session Handoff"
 description: "Use ComputerSessionHandle to pass an existing modal-computer-use desktop to a deployed Modal Function for long-running AI agent trajectories."
 ---
@@ -117,14 +117,14 @@ async with handle.borrow_async(run_id=run_id, function_region=FUNCTION_REGION) a
         await computer.actions.run([action])
 ```
 
-Each call to `computer.actions.run()` receives a gap-free sequence number. The daemon's durable receipt journal records every mutation before it is dispatched, so a lost network response can be resolved without replaying the action.
+The SDK tracks every mutation so that a lost network response can be resolved without replaying the action.
 
 ## Error handling in borrow contexts
 
 Three exception types cover the spectrum of response-loss outcomes:
 
 <Accordion title="OperationNotAppliedError">
-The daemon's receipt journal proves the operation was **never applied**. It is safe to retry with a new action in a new borrow context.
+The SDK has confirmed the operation was **never applied**. It is safe to retry with a new action in a new borrow context.
 
 ```python
 from modal_computer_use import OperationNotAppliedError
@@ -156,7 +156,7 @@ except OperationResultUnavailableError as exc:
 </Accordion>
 
 <Accordion title="ActionOutcomeUnknownError">
-The outcome is indeterminate. The receipt journal cannot prove the action was applied or not. This requires owner-level recovery: the original `ComputerSandbox` owner must inspect `recovery_status()` and call `acknowledge_recovery(incident_id=...)` before a new lease can be acquired.
+The outcome is indeterminate — the SDK cannot confirm whether the action was applied or not. This requires owner-level recovery: the original `ComputerSandbox` owner must inspect `recovery_status()` and call `acknowledge_recovery(incident_id=...)` before a new lease can be acquired.
 </Accordion>
 
 ## One-shot nature of borrow contexts
@@ -216,7 +216,7 @@ async def run_trajectory(
 ```
 
 <Note>
-`retries=0` prevents Modal from automatically re-dispatching a stateful trajectory after a container crash. Modal can still reschedule an input after a container crash regardless — the SDK's lease and receipt journal are the final mutation fence if overlapping attempts occur.
+`retries=0` prevents Modal from automatically re-dispatching a stateful trajectory after a container crash. Modal can still reschedule an input after a container crash regardless — the SDK's exclusive trajectory lease ensures that if overlapping attempts occur, only the first to acquire the lease proceeds.
 </Note>
 
 ## Full working example

@@ -1,7 +1,7 @@
 ---
-title: "Use the Anthropic Computer-Use Adapter with modal-computer-use"
+title: "Anthropic Computer-Use Adapter for modal-computer-use"
 sidebarTitle: "Anthropic Adapter"
-description: "Convert Anthropic Messages API computer tool actions to desktop operations using AnthropicAdapter. Covers tool versions, supported actions, and the agent loop."
+description: "Convert Anthropic computer tool actions to desktop operations using AnthropicAdapter. Covers tool versions, supported actions, zoom, and the agent loop."
 ---
 
 `AnthropicAdapter` converts Anthropic Messages API `computer` tool actions into native `modal-computer-use` desktop operations. You provide a `ComputerSandbox` and a tool version; the adapter handles normalization, coordinate translation, policy checks, and dispatch. The adapter never calls the Anthropic API — your application code owns the model loop, API credentials, message history, and turn limits.
@@ -158,6 +158,15 @@ tool_result = anthropic_tool_result(
     tool_use_id="toolu_abc123",
     result=ActionResult(ok=False, message="computer action failed"),
 )
+```
+
+Use `anthropic_screenshot_content()` to build a bare Anthropic `image` content block from a `Screenshot`. This is useful when you are assembling multi-part tool results (for example, a `computer_batch` result that contains multiple screenshot outputs alongside text summaries):
+
+```python
+from modal_computer_use.adapters.anthropic import anthropic_screenshot_content
+
+image_block = anthropic_screenshot_content(screenshot)
+# Returns: {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "..."}}
 ```
 
 For safe screenshot tracing metadata (dimensions, format, SHA-256, artifact URI, capture time, coordinate space — no image bytes):
