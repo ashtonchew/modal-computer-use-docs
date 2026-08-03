@@ -1,0 +1,257 @@
+---
+title: "Hand Off a Desktop Session to a Modal Function"
+sidebarTitle: "Session Handoff"
+description: "Use ComputerSessionHandle to pass an existing modal-computer-use desktop to a deployed Modal Function for long-running AI agent trajectories."
+---
+
+`modal-computer-use` lets you decouple desktop ownership from desktop usage. Your application creates and owns the Sandbox; a deployed Modal Function borrows it for one complete trajectory — the full repeated screenshot → model call → action loop — then releases it. This pattern co-locates your model calls and desktop actions inside Modal, reducing latency and making cancellation deterministic. This guide explains the ownership model, shows you how to create a handle, hand it to a Function, and handle errors inside a borrow context.
+
+## Ownership and borrowing
+
+The ownership model has two roles:
+
+- **Owner**: the process that called `ComputerSandbox.create()`. It holds the Sandbox lifecycle, keeps it running for the duration of all trajectories, and terminates it when work is done.
+- **Borrower**: a deployed Modal Function that enters `borrow_async()` once and holds that single connection across the entire repeated observe/decide/act loop. It never provisions or terminates the Sandbox.
+
+Entering `borrow_async()` acquires an **exclusive trajectory lease** on the desktop. Only one borrower can hold the lease at a time. When the borrow context exits — whether normally or on exception — the borrower detaches without terminating the desktop.
+
+## Getting a session handle
+
+Call `computer.session_handle()` on a `ComputerSandbox` (or `AsyncComputerSandbox`) that was created with an explicit `modal_region` and either `"attested-tunnel"` or `"connect"` ingress. VNC must be `"off"` or `"view_only"` — control-mode targets cannot produce a handoff handle:
+
+```python
+from modal_computer_use import ComputerConfig, ComputerSandbox
+
+FUNCTION_REGION = "us-west"
+
+config = ComputerConfig(
+    ingress="attested-tunnel",
+    runtime={"modal_environment": "main", "modal_region": FUNCTION_REGION},
+)
+
+with ComputerSandbox.create(config=config, app_name="my-handoff-app") as owner:
+    handle = owner.session_handle()
+    # Pass handle to a deployed Modal Function ...
+```
+
+`handle` is a frozen `ComputerSessionHandle`. It contains routing identity (sandbox/session ID, app, Modal environment, requested region, ingress, daemon HTTP version, VNC policy, config hash) but **no credentials**. The Function's Modal identity resolves fresh access credentials at borrow time.
+
+<Warning>
+Do not log, print, or publish the handle. Even though it contains no bearer tokens, it reveals routing and session identity that could be used to interfere with an active trajectory.
+</Warning>
+
+## Passing the handle to a Modal Function
+
+Deploy a Modal Function that accepts a `ComputerSessionHandle` as an argument. Use `modal.Function.from_name()` to look up the deployed Function, then call `.remote()` or `.spawn()`:
+
+```python
+import modal
+
+deployed = modal.Function.from_name("computer-use-function-handoff", "run_trajectory")
+
+run_id = f"trajectory_{uuid.uuid4().hex}"
+result = deployed.remote(handle, task, run_id)
+```
+
+Or spawn asynchronously and cancel if needed:
+
+```python
+call = deployed.spawn(handle, task, run_id)
+# ... later ...
+call.cancel()
+```
+
+## Entering a borrow context
+
+Inside the deployed Function, enter `borrow_async()` **once** around the complete trajectory loop. Do not create a new borrow context per action:
+
+```python
+from modal_computer_use import ComputerSessionHandle
+
+FUNCTION_REGION = "us-west"
+
+
+async def run_trajectory_body(
+    handle: ComputerSessionHandle,
+    task: str,
+    *,
+    run_id: str,
+    max_turns: int = 3,
+) -> dict:
+    async with handle.borrow_async(
+        run_id=run_id,
+        function_region=FUNCTION_REGION,
+    ) as computer:
+        for turn in range(max_turns):
+            screenshot = await computer.screenshots.full(format="png", processing="daemon")
+            action = await call_your_model(task=task, screenshot=screenshot, turn=turn)
+            await computer.actions.run([action])
+    return {"status": "succeeded"}
+```
+
+### Requirements for borrow_async()
+
+`borrow_async()` validates several preconditions before issuing credentials:
+
+- `MODAL_IS_REMOTE=1` must be set in the Function's environment. This is Modal's official deployed-Function runtime marker. Setting it locally is not sufficient.
+- `function_region` must exactly match the handle's `requested_modal_region`.
+- `run_id` must be a unique string that has never been used for a prior sealed trajectory on this desktop.
+- The handle must carry `"attested-tunnel"` or `"connect"` ingress and `vnc_mode="off"` or `"view_only"`.
+
+<Warning>
+`run_id` uniqueness is a hard requirement. After any trajectory — success or failure — the `run_id` is durably sealed. Attempting to reuse it for a new trajectory is rejected even after lease release or heartbeat expiry. Always generate a fresh `run_id` (e.g., `uuid.uuid4().hex`) for each trajectory.
+</Warning>
+
+## The trajectory loop pattern
+
+A borrow context holds one exclusive lease. Use it across the entire screenshot → model call → action loop:
+
+```python
+async with handle.borrow_async(run_id=run_id, function_region=FUNCTION_REGION) as computer:
+    for turn in range(max_turns):
+        # 1. Observe
+        screenshot = await computer.screenshots.full()
+        # 2. Decide
+        action = await application_model_call(task, screenshot)
+        # 3. Act
+        await computer.actions.run([action])
+```
+
+Each call to `computer.actions.run()` receives a gap-free sequence number. The daemon's durable receipt journal records every mutation before it is dispatched, so a lost network response can be resolved without replaying the action.
+
+## Error handling in borrow contexts
+
+Three exception types cover the spectrum of response-loss outcomes:
+
+<Accordion title="OperationNotAppliedError">
+The daemon's receipt journal proves the operation was **never applied**. It is safe to retry with a new action in a new borrow context.
+
+```python
+from modal_computer_use import OperationNotAppliedError
+
+try:
+    await computer.actions.run([action])
+except OperationNotAppliedError:
+    # Action was not applied — safe to retry with a fresh run_id
+    pass
+```
+</Accordion>
+
+<Accordion title="OperationResultUnavailableError">
+The operation **completed** but the result was lost in transit. The action ran; you just do not have its output. The borrow blocks all further mutations. You may call `observe_after_result_loss()` to capture one later visible frame:
+
+```python
+from modal_computer_use import OperationResultUnavailableError
+
+try:
+    await computer.actions.run([action])
+except OperationResultUnavailableError as exc:
+    frame = await computer.observe_after_result_loss()
+    # Inspect the visible state, then leave the borrow.
+    # exc.sequence and exc.operation_kind are safe diagnostic metadata.
+    return {"status": "indeterminate"}
+```
+
+`observe_after_result_loss()` captures one inline full-screen PNG, creates no artifact, and consumes no operation sequence. You can call it repeatedly while the borrow is open, but successful observation **never clears the mutation block** — all later mutations in that borrow still fail. To continue, leave the context and start a new borrow with a fresh `run_id`.
+</Accordion>
+
+<Accordion title="ActionOutcomeUnknownError">
+The outcome is indeterminate. The receipt journal cannot prove the action was applied or not. This requires owner-level recovery: the original `ComputerSandbox` owner must inspect `recovery_status()` and call `acknowledge_recovery(incident_id=...)` before a new lease can be acquired.
+</Accordion>
+
+## One-shot nature of borrow contexts
+
+<Warning>
+Borrow contexts are **one-shot**. Leaving the `borrow_async()` context — for any reason — detaches the borrower and releases the lease. You cannot re-enter the same context. Each trajectory requires a fresh call to `borrow_async()` with a new `run_id`.
+</Warning>
+
+The lease serialises trajectories for one desktop. If two Function invocations attempt to borrow the same desktop concurrently, the first to acquire the lease wins and the others receive `SessionBusyError`.
+
+## Concurrent trajectories across multiple desktops
+
+You can run independent trajectories in parallel by giving each one a distinct desktop handle:
+
+```python
+async def run_distinct_trajectories_body(
+    handles: list[ComputerSessionHandle],
+    tasks: list[str],
+    run_ids: list[str],
+) -> list[dict]:
+    return list(
+        await asyncio.gather(
+            *(
+                run_trajectory_body(handle, task, run_id=run_id)
+                for handle, task, run_id in zip(handles, tasks, run_ids, strict=True)
+            )
+        )
+    )
+```
+
+Each handle must reference a **distinct** Sandbox. The lease is per-desktop, so concurrent trajectories on different desktops do not interfere.
+
+## Deployed Function configuration
+
+The deployed Function's image must include `modal-computer-use[modal]`. Do not set `restrict_modal_access=True` — borrowing resolves the Sandbox and mints fresh access from inside the invocation:
+
+```python
+import modal
+
+app = modal.App("computer-use-function-handoff")
+function_image = modal.Image.debian_slim().pip_install("modal-computer-use[modal]")
+
+@app.function(
+    image=function_image,
+    region=FUNCTION_REGION,   # must match handle.requested_modal_region
+    retries=0,                # use 0 to avoid inadvertent replay of stateful trajectories
+    min_containers=0,
+    max_containers=4,
+    timeout=900,
+)
+async def run_trajectory(
+    handle: ComputerSessionHandle,
+    task: str,
+    run_id: str,
+) -> dict:
+    return await run_trajectory_body(handle, task, run_id=run_id)
+```
+
+<Note>
+`retries=0` prevents Modal from automatically re-dispatching a stateful trajectory after a container crash. Modal can still reschedule an input after a container crash regardless — the SDK's lease and receipt journal are the final mutation fence if overlapping attempts occur.
+</Note>
+
+## Full working example
+
+The [`examples/modal_function_session_handoff.py`](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/modal_function_session_handoff.py) example is the complete reference implementation. Deploy it once, then look up the Function with `modal.Function.from_name()` and invoke it:
+
+```python
+import uuid
+import modal
+from modal_computer_use import ComputerConfig, ComputerSandbox
+
+FUNCTION_REGION = "us-west"
+APP_NAME = "computer-use-function-handoff"
+
+def run_example(*, task: str, spawn: bool = False) -> dict:
+    deployed = modal.Function.from_name(APP_NAME, "run_trajectory")
+    config = ComputerConfig(
+        ingress="attested-tunnel",
+        runtime={"modal_environment": "main", "modal_region": FUNCTION_REGION},
+    )
+    with ComputerSandbox.create(config=config, app_name=APP_NAME) as owner:
+        handle = owner.session_handle()
+        run_id = f"trajectory_{uuid.uuid4().hex}"
+        if not spawn:
+            return {"mode": "remote", "result": deployed.remote(handle, task, run_id)}
+        call = deployed.spawn(handle, task, run_id)
+        return {"mode": "spawn", "result": call.get()}
+```
+
+Deploy first, then run:
+
+```bash
+uv run modal deploy examples/modal_function_session_handoff.py
+uv run python -c "
+from examples.modal_function_session_handoff import run_example
+print(run_example(task='Navigate to example.com and take a screenshot'))
+"
+```

@@ -1,0 +1,135 @@
+---
+title: "modal-computer-use Environment Variable Reference"
+sidebarTitle: "Environment Variables"
+description: "Reference for all COMPUTER_USE_* environment variables that configure the modal-computer-use daemon process when deploying without the Python SDK."
+---
+
+The modal-computer-use daemon process reads its configuration from the process environment at startup. Every `COMPUTER_USE_*` variable described here maps to an internal `DaemonSettings` field. This reference is intended for operators who launch the daemon directly—for example, in a custom container deployment—rather than through the Python SDK.
+
+<Note>
+Most users should configure the daemon through [`ComputerConfig`](/reference/config-models) when using the Python SDK. `ComputerConfig` validates ranges, maps fields to the correct environment variables, and generates secrets automatically. Setting environment variables manually bypasses those protections.
+</Note>
+
+Daemon booleans accept `1`, `true`, `yes`, or `on` (case-insensitive, surrounding whitespace ignored) as `true`. Any other non-empty value is `false`. An unset boolean uses its documented default.
+
+Required integers use their documented default when unset or empty and otherwise use standard integer parsing. Optional budget integers treat an unset or empty value as unlimited. Browser JSON arguments treat an unset or empty value as `[]`.
+
+---
+
+## Process, display, and browser
+
+These variables control how the daemon binds to the network, configures the virtual display, and manages the browser process.
+
+| Variable | Default | Description |
+|---|---|---|
+| `COMPUTER_USE_DAEMON_HOST` | `127.0.0.1` (local-token or explicit unauthenticated-loopback mode); `0.0.0.0` otherwise | Bind address for the daemon HTTP server. Startup fails when authentication is unconfigured. Explicit unauthenticated mode may bind only to loopback. Modal orchestration sets `0.0.0.0` or `::` with authentication enabled. |
+| `COMPUTER_USE_DAEMON_PORT` | `8080` | TCP port the daemon listens on. |
+| `COMPUTER_USE_DAEMON_HTTP_VERSION` | `1.1` | `"1.1"` selects Uvicorn HTTP/1.1; `"2"` selects Hypercorn h2c (cleartext HTTP/2). SDK-generated from `network.daemon_http_version`. |
+| `DISPLAY` | `:99` | X display address for the virtual framebuffer. |
+| `COMPUTER_USE_RUN_ID` | unset | Optional run identifier for log and tag correlation. SDK-generated from `run_id`. |
+| `COMPUTER_USE_DESKTOP_WIDTH` | `1024` | Virtual display width in pixels. SDK range is governed by `desktop.resolution`. |
+| `COMPUTER_USE_DESKTOP_HEIGHT` | `768` | Virtual display height in pixels. SDK range is governed by `desktop.resolution`. |
+| `COMPUTER_USE_DESKTOP_DPI` | `96` | Virtual display DPI. SDK range: `48` to `240`. |
+| `COMPUTER_USE_DISPLAY_DEPTH` | `24` | X display color depth in bits. SDK range: `8` to `32`. |
+| `COMPUTER_USE_WINDOW_MANAGER` | `xfce` | Window manager to start. Supported: `xfce`, `openbox`. Other values currently take the XFCE launch path and are unsupported. |
+| `COMPUTER_USE_BROWSER` | unset | Browser command or name. The SDK emits `firefox`, `chromium`, or empty. |
+| `COMPUTER_USE_BROWSER_PREWARM` | `false` | Start the configured browser at daemon boot unless a startup URL is set. |
+| `COMPUTER_USE_BROWSER_PROFILE_DIR` | unset | Browser profile directory path. Unset resolves to `/home/desktop/.cache/modal-computer-use/browser-profile` at use time. |
+| `COMPUTER_USE_BROWSER_LAUNCH_ARGS` | `[]` | JSON array of additional browser launch arguments. Each element must be a string; invalid JSON or non-string entries fail settings construction. |
+| `COMPUTER_USE_BROWSER_OPEN_URL_ON_START` | unset | URL to open when the browser first starts. Takes precedence over blank-page prewarm. **Treat as secret-bearing.** |
+| `COMPUTER_USE_BROWSER_GPU_MODE` | `auto` | Browser GPU acceleration mode. Supported: `auto`, `off`, `chromium-vulkan`. |
+| `COMPUTER_USE_IMAGE_PROFILE` | `standard` | Informational resource profile label. The SDK emits `standard`, `browser`, `browser-gpu`, or `custom`. |
+
+---
+
+## Desktop backends and action policy
+
+These variables control the X11 input stack, action batch limits, timeouts, and rate limiting.
+
+| Variable | Default | Description |
+|---|---|---|
+| `COMPUTER_USE_BACKEND` | `auto` | Desktop backend. `auto` selects X11 on POSIX and fails closed if required tools are unavailable. `mock` is for deterministic local tests only. Validated at settings construction. |
+| `COMPUTER_USE_INPUT_BACKEND` | `auto` | Input adapter policy. `auto` prefers persistent XTest/XKB and falls back to compatibility only before emission. `xtest` forces native XTest/XKB. `xdotool` forces the legacy adapter. Validated at settings construction. |
+| `COMPUTER_USE_SUBPROCESS_BACKEND` | `isolated-asyncio` | Backend for subprocess-backed commands: `asyncio`, `threaded`, or `isolated-asyncio`. Validated at settings construction. |
+| `COMPUTER_USE_MAX_BATCH_ACTIONS` | `50` | Maximum actions per batch, including nested actions. SDK range: `1` to `500`. |
+| `COMPUTER_USE_MAX_ACTION_DEPTH` | `32` | Maximum nesting depth for `hold_key` action trees. Range: `1` to `128`. Cannot be disabled. |
+| `COMPUTER_USE_MAX_BATCH_DURATION_MS` | `30000` | Wall-clock deadline for one action batch in milliseconds. SDK range: `1` to `600000`. |
+| `COMPUTER_USE_DEFAULT_ACTION_TIMEOUT_MS` | `5000` | Per-action timeout in milliseconds when no explicit timeout is supplied. SDK range: `1` to `300000`. |
+| `COMPUTER_USE_MAX_ACTION_TIMEOUT_MS` | `300000` | Upper bound on any per-action or per-request timeout in milliseconds. SDK range: `1` to `600000`. |
+| `COMPUTER_USE_POST_ACTION_DELAY_MS` | `0` | Pause in milliseconds after each UI-mutating action. SDK range: `0` to `10000`. |
+| `COMPUTER_USE_INPUT_RATE_LIMIT_PER_SEC` | `20` | Rolling one-second cap on input-affecting actions. `0` or below disables rate limiting; use `0`. SDK range: `0` to `10000`. |
+| `COMPUTER_USE_SCREENSHOT_MAX_PIXELS` | `8294400` | Output-pixel ceiling for region captures and `screenshot_after`. No corresponding `ComputerConfig` field. |
+| `COMPUTER_USE_SCREENSHOT_PROCESSING_LOCATION` | `auto` | Processing location label: `auto`, `daemon`, or `client`. The daemon records this but currently no route branches on it. |
+| `COMPUTER_USE_READINESS_CACHE_TTL_MS` | `1000` | Milliseconds to cache a successful desktop-readiness probe result. Values at or below zero disable caching. No corresponding `ComputerConfig` field. |
+| `COMPUTER_USE_IDEMPOTENCY_CACHE_MAX_ENTRIES` | `1000` | Maximum number of idempotency cache entries. `0` disables retention. No corresponding `ComputerConfig` field. |
+| `COMPUTER_USE_IDEMPOTENCY_CACHE_TTL_SECONDS` | `3600` | Idempotency cache TTL in seconds. No corresponding `ComputerConfig` field. |
+
+---
+
+## Transport and collection bounds
+
+These variables cap attacker-controlled allocation and work. A value of `0` disables a limit only where stated. Artifact uploads are streamed and are not subject to the JSON body ceiling.
+
+| Variable | Default | Description |
+|---|---|---|
+| `COMPUTER_USE_MAX_JSON_BODY_BYTES` | `16777216` | Maximum JSON request body size in bytes at the ASGI receive boundary. `0` explicitly disables the ceiling; oversized requests return `413 request_body_too_large`. |
+| `COMPUTER_USE_MAX_WEBSOCKET_MESSAGE_BYTES` | `16777216` | Maximum WebSocket message size passed to Uvicorn or Hypercorn. `0` explicitly disables the ceiling. |
+| `COMPUTER_USE_MAX_HOT_SESSION_CONNECTIONS` | `64` | Global cap on concurrent hot-session WebSocket connections. `0` means unlimited. Rejected connections close with code `1013`. |
+| `COMPUTER_USE_MAX_OBSERVATION_CONNECTIONS` | `16` | Global cap on concurrent observation-stream WebSocket connections. `0` means unlimited. Rejected connections close with code `1013`. |
+| `COMPUTER_USE_MAX_COMMAND_ARGUMENTS` | `65536` | Maximum argument count for command and app-launch vectors. `0` means unlimited. Each argument is also bounded by the Linux encoded-byte limit. |
+| `COMPUTER_USE_MAX_DRAG_POINTS` | `1024` | Maximum number of points in a drag path. `0` means unlimited. |
+| `COMPUTER_USE_MAX_KEY_COLLECTION_SIZE` | `64` | Maximum entries in modifier and hotkey collections. `0` means unlimited. |
+
+---
+
+## Authentication and VNC
+
+These variables configure bearer-token authentication for daemon access and control noVNC exposure. Treat all token and password values as secrets.
+
+| Variable | Default | Description |
+|---|---|---|
+| `COMPUTER_USE_LOCAL_TOKEN` | unset | Static bearer token for local or direct deployments. Also changes the default bind host to loopback. **Secret.** |
+| `COMPUTER_USE_TUNNEL_TOKEN` | unset | Static daemon bearer token for raw tunnel access and SDK attested-tunnel bootstrap. The SDK generates this for Modal-created Sandboxes. **Secret.** |
+| `COMPUTER_USE_TUNNEL_TOKEN_TTL_SECONDS` | `3600` | Lifetime in seconds for tokens minted after `/v1/session/tunnel-authorize`. No arbitrary maximum. |
+| `COMPUTER_USE_MAX_TUNNEL_SESSIONS` | `0` | Cap on active minted tunnel sessions. `0` means unlimited. Reaching the cap rejects new minting without evicting existing sessions. |
+| `COMPUTER_USE_REQUIRE_CONNECT_USER` | `true` | Require Modal's verified-user header on protected control requests. The SDK sets this only for pure Connect ingress. Health and readiness probes remain unauthenticated. |
+| `COMPUTER_USE_ALLOW_UNAUTHENTICATED_LOOPBACK` | `false` | Escape hatch for local-only deployments with no token or Connect authentication configured. The daemon refuses a non-loopback bind address in this mode. |
+| `COMPUTER_USE_TRUST_PRIVATE_CONNECT_PROXY` | `false` | Trust Modal's private Connect proxy headers. The SDK sets `true` only for pure Connect ingress. Raw tunnel deployments must leave this off because tunnel clients control request headers. |
+| `COMPUTER_USE_REJECT_QUERY_TOKENS` | `true` | Reject credentials supplied in URL query parameters. Keep this enabled because URLs appear in logs and shell history. |
+| `COMPUTER_USE_VNC_MODE` | `off` | noVNC exposure mode: `off`, `view_only`, or `control`. SDK-generated from `expose_vnc`. |
+| `COMPUTER_USE_VNC_PASSWORD` | unset | noVNC/x11vnc password. If VNC is enabled and this is unset, the daemon supervisor generates one in its private runtime directory. The SDK normally generates and injects one first. **Secret.** |
+
+---
+
+## Artifacts, recordings, and traces
+
+These variables configure where the daemon stores files and whether persistence is active.
+
+| Variable | Default | Description |
+|---|---|---|
+| `COMPUTER_USE_ARTIFACTS_DIR` | `/home/desktop/artifacts` | Root path of the artifact store inside the container. |
+| `COMPUTER_USE_ARTIFACTS_PERSISTENT` | `false` | Declaration that artifact persistence is requested. SDK-generated from `storage.persist_artifacts`. |
+| `COMPUTER_USE_ARTIFACTS_VOLUME_MOUNTED` | `false` | Proof flag that a Modal Volume covers the artifact path. Computed internally by the SDK from actual mounts. Do not set this to claim persistence without a real Volume. |
+| `COMPUTER_USE_RECORDINGS_DIR` | `/home/desktop/recordings` | Directory inside the container where screen recordings are written. |
+| `COMPUTER_USE_RUNTIME_DIR` | `/tmp/modal-computer-use` | Runtime process state and private VNC password-file directory. No corresponding `ComputerConfig` field. |
+| `COMPUTER_USE_TRACE_DIR` | `/home/desktop/artifacts/traces` | NDJSON action trace directory. |
+| `COMPUTER_USE_TRACE_ACTIONS` | `false` | Append a trace entry for every executed action. SDK-generated from `actions.trace_actions`. |
+
+---
+
+## Run budgets and observability
+
+These variables enforce per-session consumption limits and enable optional OpenTelemetry spans.
+
+| Variable | Default | Description |
+|---|---|---|
+| `COMPUTER_USE_MAX_ACTIONS` | unset | Maximum number of attempted executable desktop actions. Unset or empty means unlimited. |
+| `COMPUTER_USE_MAX_SCREENSHOTS` | unset | Maximum number of reserved screenshot operations. Unset or empty means unlimited. |
+| `COMPUTER_USE_MAX_ARTIFACT_BYTES` | unset | Maximum projected artifact store size in bytes. Unset or empty means unlimited. |
+| `COMPUTER_USE_MAX_RECORDING_SECONDS` | unset | Maximum total recording duration in seconds. Unset or empty means unlimited. |
+| `COMPUTER_USE_MAX_IDLE_SECONDS` | unset | Maximum seconds since the last budget-counted activity. Unset or empty means unlimited. |
+| `COMPUTER_USE_OTEL_ENABLED` | `false` | Enable bounded OpenTelemetry spans. Requires the optional `opentelemetry-api` package. Disabled mode does not require it. |
+
+<Note>
+SDK-generated runner variables (`COMPUTER_USE_DAEMON_BASE_URL`, `COMPUTER_USE_DAEMON_TOKEN`, `COMPUTER_USE_DAEMON_RUNNER_PATH`, `COMPUTER_USE_TARGET_SANDBOX_ID`) are transport variables for SDK-started helper processes. They are reserved by `modal_daemon_env`; a caller-supplied runner environment cannot override them. Treat all of them as secret-bearing.
+</Note>

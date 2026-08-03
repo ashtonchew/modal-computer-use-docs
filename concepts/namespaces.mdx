@@ -1,0 +1,409 @@
+---
+title: "Desktop Control Namespaces in modal-computer-use"
+sidebarTitle: "Namespaces"
+description: "Every desktop operation in modal-computer-use is organized into typed namespaces on the computer object — mouse, keyboard, browser, screenshots, and more."
+---
+
+Once you have a `computer` object — from `ComputerSandbox`, `AsyncComputerSandbox`, or `AsyncDaemonClient` — every desktop operation you can perform lives in a typed namespace attached to it. Instead of a flat list of functions, the SDK groups related operations together: `computer.mouse` for pointer work, `computer.keyboard` for text and key input, `computer.browser` for URL navigation, and so on. This organization makes it easy to discover capabilities through autocomplete and keeps your code readable at a glance.
+
+All three client types (`ComputerSandbox`, `AsyncComputerSandbox`, `AsyncDaemonClient`) expose the same namespaces. In async clients, every method is a coroutine — simply `await` it.
+
+---
+
+## Namespace overview
+
+| Namespace | Purpose |
+|---|---|
+| `computer.mouse` | Pointer movement, clicks, drags, scrolling |
+| `computer.keyboard` | Text input, key presses, hotkeys, hold sequences |
+| `computer.clipboard` | Read and write clipboard text |
+| `computer.screenshots` | Capture full screen, regions, and zooms |
+| `computer.recordings` | Record, list, download, and delete screen recordings |
+| `computer.display` | Query display geometry and settings |
+| `computer.windows` | List, activate, close, and wait for windows |
+| `computer.actions` | Run, validate, and apply batched action sequences |
+| `computer.artifacts` | Read, write, upload, download, and sync files |
+| `computer.browser` | Open URLs, check browser status, measure render metrics |
+| `computer.apps` | Launch applications and open artifacts |
+| `computer.commands` | Run shell commands inside the Sandbox |
+| `computer.input` | Release all held keys and mouse buttons |
+| `computer.lifecycle` | Start, stop, restart, and inspect desktop services |
+| `computer.processes` | Inspect service status, logs, and errors |
+| `computer.session` | Read session metadata and refresh the connection |
+| `computer.debug` | Retrieve debug and noVNC URLs |
+
+---
+
+## Input namespaces
+
+<Accordion title="computer.mouse — pointer control">
+  `computer.mouse` gives you full control over the virtual pointer. Use it for clicks, moves, drags, scrolls, and raw button presses.
+
+  **Methods:** `click`, `move`, `drag`, `scroll`, `down`, `up`, `position`
+
+  ```python
+  # Move to a coordinate and left-click
+  computer.mouse.move(320, 240)
+  computer.mouse.click(320, 240)
+
+  # Right-click
+  computer.mouse.click(320, 240, button="right")
+
+  # Scroll down three units at the current position
+  computer.mouse.scroll(0, -3)
+
+  # Drag from one point to another
+  computer.mouse.drag(100, 100, 400, 300)
+
+  # Query the current pointer position
+  pos = computer.mouse.position()
+  print(pos.x, pos.y)
+  ```
+</Accordion>
+
+<Accordion title="computer.keyboard — text and key input">
+  `computer.keyboard` handles all forms of text and key input: typing strings, pressing individual keys, triggering hotkeys, and holding modifier keys during complex sequences.
+
+  **Methods:** `type`, `press`, `hotkey`, `hold`, `supported_keys`
+
+  ```python
+  # Type a string of text
+  computer.keyboard.type("Hello, world!")
+
+  # Press a single key (e.g. Enter, Tab, Escape)
+  computer.keyboard.press("Return")
+
+  # Trigger a keyboard shortcut
+  computer.keyboard.hotkey("ctrl", "c")   # Copy
+  computer.keyboard.hotkey("ctrl", "z")   # Undo
+
+  # Hold a modifier while performing nested actions (via actions.run)
+  # For a list of all key names the daemon accepts:
+  keys = computer.keyboard.supported_keys()
+  print(keys)
+  ```
+
+  <Note>
+  `type()` uses `method="auto"` by default, which switches to clipboard paste for long or Unicode-heavy strings that are difficult to map through native key events.
+  </Note>
+</Accordion>
+
+<Accordion title="computer.clipboard — clipboard text">
+  `computer.clipboard` lets you read and write the desktop clipboard. This is useful for extracting visible text from the desktop or seeding the clipboard before a paste operation.
+
+  **Methods:** `get_text`, `set_text`, `clear`
+
+  ```python
+  # Write text to the clipboard, then paste it
+  computer.clipboard.set_text("https://example.com")
+  computer.keyboard.hotkey("ctrl", "v")
+
+  # Read whatever is currently on the clipboard
+  text = computer.clipboard.get_text()
+  print(text)
+
+  # Clear the clipboard
+  computer.clipboard.clear()
+  ```
+</Accordion>
+
+---
+
+## Observation namespaces
+
+<Accordion title="computer.screenshots — screen capture">
+  `computer.screenshots` captures what the desktop currently looks like. You can grab the full screen, a specific region, or a zoomed view centered on a point of interest.
+
+  **Methods:** `full`, `region`, `zoom`, `zoom_around`
+
+  ```python
+  # Capture the full desktop
+  shot = computer.screenshots.full()
+  shot.save("desktop.png")
+  print(shot.width, shot.height, shot.sha256)
+
+  # Capture a specific region (x, y, width, height)
+  region_shot = computer.screenshots.region(0, 0, 512, 384)
+  region_shot.save("top-left.png")
+
+  # Zoom in on a point — returns a cropped, upscaled view
+  zoomed = computer.screenshots.zoom(320, 240, scale=2.0)
+  zoomed.save("zoomed.png")
+  ```
+</Accordion>
+
+<Accordion title="computer.recordings — screen recordings">
+  `computer.recordings` manages screen recordings stored in the daemon's recordings directory. You can start and stop recordings, list them, download them locally, and delete them.
+
+  **Methods:** `start`, `stop`, `list`, `get`, `download`, `delete`
+
+  ```python
+  # Start a recording
+  rec = computer.recordings.start()
+  print(rec.artifact_uri)
+
+  # ... do some desktop work ...
+
+  # Stop the recording
+  stopped = computer.recordings.stop()
+  print(stopped.duration, stopped.size)
+
+  # List all recordings
+  all_recs = computer.recordings.list()
+  for r in all_recs:
+      print(r.output_path, r.status)
+
+  # Download the recording to a local file
+  computer.recordings.download(stopped.artifact_uri, "session.mp4")
+  ```
+</Accordion>
+
+<Accordion title="computer.display — display geometry">
+  `computer.display` returns information about the virtual display — its resolution, DPI, and color depth.
+
+  **Methods:** `info`
+
+  ```python
+  info = computer.display.info()
+  print(info.width, info.height, info.dpi)
+  ```
+</Accordion>
+
+<Accordion title="computer.windows — window management">
+  `computer.windows` lets you inspect and control application windows on the desktop — listing open windows, finding the active one, bringing a window to the foreground, closing it, or waiting for a specific window to appear.
+
+  **Methods:** `list`, `active`, `activate`, `close`, `wait_for`
+
+  ```python
+  # List all open windows
+  windows = computer.windows.list()
+  for w in windows:
+      print(w.title, w.id)
+
+  # Get the currently focused window
+  active = computer.windows.active()
+  print(active.title)
+
+  # Activate (focus) a specific window by its ID
+  computer.windows.activate(windows[0].id)
+
+  # Wait until a window with a given title appears (blocks until found or timeout)
+  window = computer.windows.wait_for(title="Visual Studio Code", timeout_ms=10_000)
+  ```
+</Accordion>
+
+---
+
+## Action namespace
+
+<Accordion title="computer.actions — batched action sequences">
+  `computer.actions` is the structured batch execution interface. Instead of issuing one operation at a time, you build a list of action dictionaries and send them as a single atomic request. The daemon validates the entire batch before executing anything, and stops at the first error by default.
+
+  **Methods:** `apply`, `run`, `validate`
+
+  ```python
+  # Run a batch of actions, capturing a screenshot at the end
+  result = computer.actions.run(
+      [
+          {"type": "move", "x": 320, "y": 240},
+          {"type": "click", "x": 320, "y": 240},
+          {"type": "type", "text": "Hello from a batch!"},
+      ],
+      screenshot_after=True,
+  )
+
+  # The trailing screenshot is available on the result
+  if result.screenshot:
+      result.screenshot.save("after-batch.png")
+
+  # Validate a batch without executing it
+  errors = computer.actions.validate([
+      {"type": "click", "x": -1, "y": -1},  # Invalid — will flag a validation error
+  ])
+
+  # Continue executing even if one action fails
+  result = computer.actions.run(
+      [{"type": "click", "x": 100, "y": 100}, {"type": "click", "x": 200, "y": 200}],
+      continue_on_error=True,
+  )
+  ```
+
+  <Note>
+  Action budgets count each attempted executable desktop action, including ones that fail or time out. Validation failures and idempotency replays do not count against the budget.
+  </Note>
+</Accordion>
+
+---
+
+## File and storage namespaces
+
+<Accordion title="computer.artifacts — file system access">
+  `computer.artifacts` is the primary interface for reading and writing files inside the Sandbox. You can upload local files to the daemon, download files from it, list the artifact directory, delete files, and sync to persistent storage if a Modal Volume is configured.
+
+  **Methods:** `list`, `read_bytes`, `write_bytes`, `download`, `upload`, `delete`, `manifest`, `sync`
+
+  ```python
+  # Upload a local file into the Sandbox artifact directory
+  computer.artifacts.upload("./local-data.json", "data.json")
+
+  # Read the contents of a file in the artifact directory
+  raw = computer.artifacts.read_bytes("data.json")
+
+  # Write bytes directly into the artifact directory
+  computer.artifacts.write_bytes("output.txt", b"Hello from outside!")
+
+  # Download a file from the Sandbox to the local filesystem
+  computer.artifacts.download("output.txt", "./output.txt")
+
+  # List all artifacts
+  items = computer.artifacts.list()
+  for item in items:
+      print(item.path, item.size)
+
+  # Delete an artifact
+  computer.artifacts.delete("output.txt")
+
+  # Sync artifacts to persistent storage (requires a Modal Volume)
+  sync_result = computer.artifacts.sync()
+  print(sync_result.ok, sync_result.persistent)
+  ```
+</Accordion>
+
+---
+
+## Browser and app namespaces
+
+<Accordion title="computer.browser — browser control">
+  `computer.browser` provides high-level browser operations. You can open a URL, check whether the browser is ready, and read render performance metrics.
+
+  **Methods:** `open_url`, `status`, `render_metrics`
+
+  ```python
+  # Navigate to a URL in the configured browser
+  computer.browser.open_url("https://example.com")
+
+  # Check browser readiness
+  status = computer.browser.status()
+  print(status)
+
+  # Read render timing metrics from the last page load
+  metrics = computer.browser.render_metrics()
+  print(metrics)
+  ```
+</Accordion>
+
+<Accordion title="computer.apps — application launcher">
+  `computer.apps` lets you launch named applications and open artifact files with their default application.
+
+  **Methods:** `launch`, `open_artifact`
+
+  ```python
+  # Launch a named application
+  computer.apps.launch("gedit")
+
+  # Open an artifact file with its default application
+  computer.apps.open_artifact("report.pdf")
+  ```
+</Accordion>
+
+<Accordion title="computer.commands — shell execution">
+  `computer.commands` runs arbitrary shell commands inside the Sandbox. Command stdout and stderr are returned in the result. Known secret-bearing strings are sanitized before the daemon returns them.
+
+  **Methods:** `run`
+
+  ```python
+  result = computer.commands.run(["ls", "-la", "/home/desktop"])
+  print(result.stdout)
+  print(result.stderr)
+  ```
+
+  <Warning>
+  `computer.commands.run()` is serialized under the daemon's input lock because commands can affect the GUI (for example, via `xdotool`). Avoid long-running commands here; use `computer.artifacts` to read output files instead.
+  </Warning>
+</Accordion>
+
+---
+
+## State and control namespaces
+
+<Accordion title="computer.input — release held controls">
+  `computer.input` provides a single emergency cleanup method. If a batch or sequence left keys or mouse buttons in a held state, call `release_all()` to reset all input.
+
+  **Methods:** `release_all`
+
+  ```python
+  # Release every currently held key and mouse button
+  result = computer.input.release_all()
+  print(result.keys)    # Keys that were successfully released
+  print(result.buttons) # Buttons that were successfully released
+  ```
+</Accordion>
+
+<Accordion title="computer.lifecycle — desktop service control">
+  `computer.lifecycle` lets you start, stop, and restart the in-Sandbox desktop services, and inspect their current status. Use this if you need to restart a window manager or a daemon component without terminating the entire Sandbox.
+
+  **Methods:** `start`, `stop`, `restart`, `status`
+
+  ```python
+  status = computer.lifecycle.status()
+  print(status)
+
+  # Restart the desktop environment
+  computer.lifecycle.restart()
+  ```
+</Accordion>
+
+<Accordion title="computer.processes — service process inspection">
+  `computer.processes` lets you inspect daemon-managed background processes (such as the browser, window manager, or VNC server). You can check their status, retrieve logs, and read stderr output.
+
+  **Methods:** `status`, `restart`, `logs`, `stderr`, `errors`
+
+  ```python
+  # Check all managed process statuses
+  statuses = computer.processes.status()
+  for proc in statuses:
+      print(proc.name, proc.state)
+
+  # Retrieve the last N log lines from a named process
+  log_lines = computer.processes.logs("browser", tail=50)
+  print(log_lines)
+
+  # Read stderr from a named process
+  err = computer.processes.stderr("browser")
+  print(err)
+  ```
+</Accordion>
+
+<Accordion title="computer.session — session metadata">
+  `computer.session` exposes the daemon's view of the current session, including the session ID, daemon version, and capabilities. Call `refresh()` to re-establish the connection after a brief interruption.
+
+  **Methods:** `metadata`, `refresh`
+
+  ```python
+  meta = computer.session.metadata()
+  print(meta.session_id, meta.daemon_version)
+
+  # Re-connect if the session was briefly interrupted
+  computer.session.refresh()
+  ```
+</Accordion>
+
+<Accordion title="computer.debug — debug URLs">
+  `computer.debug` returns the daemon's view of available URLs, including a noVNC browser URL when VNC is enabled. For Modal-managed Sandboxes, prefer `ComputerSandbox.debug_urls()` (the SDK-level method) rather than this namespace, since the SDK has access to additional Modal-managed URL information.
+
+  **Methods:** `urls`, `vnc_url`
+
+  ```python
+  # Get all available debug URLs (daemon-level view)
+  urls = computer.debug.urls()
+  print(urls)
+
+  # Get the noVNC URL directly
+  vnc = computer.debug.vnc_url()
+  print(vnc)
+  ```
+
+  <Note>
+  For Modal-created Sandboxes, call `ComputerSandbox.debug_urls()` instead — it includes Modal-managed noVNC tunnel URLs that the daemon itself does not know about.
+  </Note>
+</Accordion>

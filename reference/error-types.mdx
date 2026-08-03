@@ -1,0 +1,336 @@
+---
+title: "Error Types and Exception Handling in modal-computer-use"
+sidebarTitle: "Error Types"
+description: "Reference for all exception types raised by modal-computer-use, with causes, HTTP status codes, and recovery guidance for each error class."
+---
+
+Every exception raised by `modal-computer-use` inherits from `ComputerUseError`. This hierarchy lets you catch all SDK errors with a single `except ComputerUseError` clause, or handle specific failure modes precisely. The sections below group errors by the layer where they originate — sandbox and session management, individual operations, and configuration — so you can map each exception to the part of your call stack most likely to encounter it.
+
+```python
+from modal_computer_use import (
+    SandboxUnavailableError,
+    SandboxAmbiguousError,
+    ConfigConflictError,
+    SessionBorrowError,
+    SessionCompatibilityError,
+    SessionEnvironmentMismatchError,
+    SessionPlacementMismatchError,
+    SessionTargetMismatchError,
+    SessionBusyError,
+    SessionLeaseLostError,
+    SessionRecoveryRequiredError,
+    OperationNotAppliedError,
+    OperationResultUnavailableError,
+    ActionOutcomeUnknownError,
+    RunSequenceConflictError,
+    FrameValidationError,
+    BrowserReadinessError,
+)
+```
+
+---
+
+## Sandbox and session errors
+
+These errors occur when the SDK cannot locate a sandbox, the session handoff preconditions fail, or the borrowed lease is in an unexpected state. Most arise during `attach()`, `attach_or_create()`, or entry into a `borrow()` / `borrow_async()` context.
+
+### `SandboxUnavailableError`
+
+Raised when the SDK cannot find or contact the target sandbox. Common causes include a sandbox ID that does not exist, a sandbox that has already terminated, or a transient network failure resolving the Modal sandbox.
+
+```python
+from modal_computer_use import AsyncComputerSandbox, SandboxUnavailableError
+
+try:
+    async with AsyncComputerSandbox.attach(sandbox_id="sb-missing") as computer:
+        await computer.screenshots.full()
+except SandboxUnavailableError as exc:
+    # The sandbox does not exist or is unreachable.
+    # Check the sandbox_id and whether it is still running.
+    print(f"Sandbox unavailable: {exc}")
+```
+
+### `SandboxAmbiguousError`
+
+A subclass of `SandboxUnavailableError`. Raised when an attach query (by `name` or `run_id`) matches more than one live sandbox. You must use a more specific selector — such as a direct `sandbox_id` — to resolve the conflict.
+
+```python
+from modal_computer_use import AsyncComputerSandbox, SandboxAmbiguousError
+
+try:
+    async with AsyncComputerSandbox.attach(name="shared-desktop") as computer:
+        pass
+except SandboxAmbiguousError:
+    # More than one sandbox matches that name.
+    # Attach by explicit sandbox_id instead.
+    pass
+```
+
+### `ConfigConflictError`
+
+Raised by `attach_or_create()` when the existing sandbox carries a `config_hash` tag that differs from the hash of your requested `ComputerConfig`. The SDK fails closed rather than silently connecting to an incompatible configuration.
+
+If you intentionally want to attach to a sandbox regardless of its config, call `attach()` directly instead of `attach_or_create()`.
+
+| Attribute | Type | Description |
+|---|---|---|
+| `requested_hash` | `str \| None` | Config hash computed from your requested config. |
+| `existing_hash` | `str \| None` | Config hash found on the live sandbox. |
+| `sandbox_id` | `str \| None` | The conflicting sandbox's ID. |
+
+```python
+from modal_computer_use import AsyncComputerSandbox, ConfigConflictError, ComputerConfig
+
+config = ComputerConfig()
+
+try:
+    async with AsyncComputerSandbox.attach_or_create(
+        name="my-desktop", config=config
+    ) as computer:
+        pass
+except ConfigConflictError as exc:
+    print(f"Config mismatch on {exc.sandbox_id}")
+    print(f"  Requested: {exc.requested_hash}")
+    print(f"  Existing:  {exc.existing_hash}")
+    # Use attach(name="my-desktop") if you want to connect regardless.
+```
+
+### `SessionCompatibilityError`
+
+Raised when the live sandbox session does not support the handoff protocol version used by this SDK build. This typically indicates a daemon/SDK version skew.
+
+<Note>
+`SessionCompatibilityError` is the base class for `SessionEnvironmentMismatchError` and `SessionPlacementMismatchError`. You can catch all three with a single `except SessionCompatibilityError` if you treat them identically.
+</Note>
+
+### `SessionEnvironmentMismatchError`
+
+A subclass of `SessionCompatibilityError`. Raised when the Modal environment the Function is running in does not match the environment recorded on the session handle. The borrow is rejected before any credentials are issued.
+
+```python
+from modal_computer_use import SessionEnvironmentMismatchError
+
+try:
+    async with handle.borrow_async(
+        run_id=run_id, function_region="us-east"
+    ) as computer:
+        pass
+except SessionEnvironmentMismatchError:
+    # Your deployed Function is in a different Modal environment
+    # than the one that created the handle.
+    raise
+```
+
+### `SessionPlacementMismatchError`
+
+A subclass of `SessionCompatibilityError`. Raised when the Modal Function's placement region does not exactly match `handle.requested_modal_region`. The borrow requires that `function_region` equals the region on the handle.
+
+### `SessionTargetMismatchError`
+
+Raised when the live sandbox target (sandbox ID or session ID) does not match the values recorded in the `ComputerSessionHandle`. This prevents a borrowed Function from being directed at the wrong desktop.
+
+### `SessionBorrowError`
+
+The base class for all session-borrow failures. You can catch `SessionBorrowError` to handle any borrow problem with a single handler. All subclasses set a fixed, generic message; they never expose secret-bearing fields in their string representation.
+
+```python
+from modal_computer_use import SessionBorrowError
+
+try:
+    async with handle.borrow_async(run_id=run_id, function_region=region) as computer:
+        await run_trajectory(computer)
+except SessionBorrowError as exc:
+    # Covers all borrow-time failures: environment, placement, target,
+    # busy, lease-lost, sequence conflict, and recovery-required.
+    print(f"Borrow failed: {type(exc).__name__}")
+```
+
+### `SessionBusyError`
+
+Raised when another caller already holds the exclusive trajectory lease on this session. Only one borrower may hold the lease at a time; you must wait for the existing borrow to finish before starting a new one.
+
+<Warning>
+Do not share a `ComputerSessionHandle` across concurrent callers without coordinating lease ownership. `SessionBusyError` indicates an exclusive lease is already active, not a transient error you should retry immediately.
+</Warning>
+
+### `SessionLeaseLostError`
+
+Raised during an active borrow when the daemon detects that the borrower no longer owns the session lease. This can occur if the lease expired due to a missed heartbeat or if the session was forcibly reclaimed.
+
+When you catch `SessionLeaseLostError`, treat the current borrow as closed. Do not attempt further mutations. Start a new borrow with a fresh `run_id` for the next trajectory.
+
+### `SessionRecoveryRequiredError`
+
+Raised when the daemon has recorded an indeterminate outcome on the session and requires the **owner** (the original `ComputerSandbox` that created the sandbox) to explicitly acknowledge the incident before further use. The session is locked for mutations until recovery is acknowledged.
+
+```python
+from modal_computer_use import SessionRecoveryRequiredError
+
+try:
+    async with handle.borrow_async(run_id=run_id, function_region=region) as computer:
+        await computer.actions.run(actions)
+except SessionRecoveryRequiredError:
+    # Only the ComputerSandbox owner can recover.
+    # Call computer_sandbox.recovery_status() and
+    # computer_sandbox.acknowledge_recovery(incident_id=...) on the owner object.
+    raise
+```
+
+<Note>
+Attached objects (those created with `attach()`) cannot acknowledge a recovery incident. Only the owner created with `create()` holds the required proof. Attempting recovery on an attached handle fails closed.
+</Note>
+
+---
+
+## Operation errors
+
+These errors arise after a borrow is established, during the execution of a single operation — typically an action batch, a command, or a result-retrieval call. They encode the daemon's durable receipt resolution: whether the operation is provably absent, provably completed but lost, or genuinely unknown.
+
+### `OperationNotAppliedError`
+
+Raised when the daemon's durable receipt proves that the operation **did not execute**. The action batch was never applied to the desktop. This is the safest outcome for an ambiguous response: you can discard the original request and issue a new one with a fresh call ID.
+
+```python
+from modal_computer_use import OperationNotAppliedError
+
+try:
+    await computer.actions.run(actions)
+except OperationNotAppliedError:
+    # The operation provably did not run. Safe to retry with a new request.
+    result = await computer.actions.run(actions)
+```
+
+### `OperationResultUnavailableError`
+
+Raised when the daemon's durable receipt proves the operation **completed**, but the result was lost before the SDK could read it. The operation ran and may have changed desktop state, but you cannot recover the response body.
+
+| Attribute | Type | Description |
+|---|---|---|
+| `sequence` | `int` | The nonnegative sequence number of the completed operation. Use this as safe diagnostic metadata only; do not use it to re-address or replay the operation. |
+| `operation_kind` | `str \| None` | An allowlisted stable daemon route label (e.g. `"actions.run"`, `"/v1/screenshots/full"`), or `None` if the daemon did not supply a known stable label. |
+
+<Warning>
+`OperationResultUnavailableError` does **not** mean the operation was harmless. The desktop may have changed. Do not retry the same action; instead, observe the current screen state and decide how to proceed.
+</Warning>
+
+#### Recovery with `observe_after_result_loss()`
+
+After catching `OperationResultUnavailableError`, you can call `observe_after_result_loss()` on the borrowed computer to capture the current screen as an inline PNG. This lets you see the desktop's current visual state before deciding what to do next.
+
+```python
+from modal_computer_use import OperationResultUnavailableError
+
+try:
+    await computer.actions.run(actions)
+except OperationResultUnavailableError as exc:
+    print(f"Result lost for sequence={exc.sequence}, kind={exc.operation_kind}")
+
+    # Observe the current screen without issuing a new mutation.
+    frame = await computer.observe_after_result_loss()
+    # Inspect frame and decide application-level next step.
+    # You MUST leave this borrow and start a fresh run_id for any
+    # further mutations — every mutation in this borrow will fail.
+```
+
+**Important constraints on `observe_after_result_loss()`:**
+
+- Accepts no options. Always captures a full-screen inline PNG with daemon-side processing.
+- Creates no artifact and consumes no operation sequence number.
+- May be called multiple times in the same borrow.
+- **Does not clear the mutation block.** All subsequent mutations in the current borrow still fail. Any continuation requiring mutations must use a new borrow context with a fresh `run_id`.
+- Cannot reconstruct intermediate frames, prove application readiness, or reveal effects invisible to the screen (commands, clipboard, filesystem, network).
+
+### `ActionOutcomeUnknownError`
+
+Raised when the outcome is genuinely indeterminate — the receipt record does not prove the operation ran or did not run. You cannot safely retry the original operation because it may have partially executed.
+
+```python
+from modal_computer_use import ActionOutcomeUnknownError
+
+try:
+    await computer.actions.run(actions)
+except ActionOutcomeUnknownError:
+    # Cannot determine if the action ran. Do not replay.
+    # If the session target requires recovery, the owner must acknowledge it.
+    raise
+```
+
+### `RunSequenceConflictError`
+
+Raised when a run operation's sequence number conflicts with the daemon's current session state. Sequence numbers are gap-free and shared across HTTP, hot-session, and observation transports. You should not encounter this error in normal usage; it indicates an ordering or concurrency problem in how you are issuing operations.
+
+### `FrameValidationError`
+
+A subclass of both `ComputerUseError` and `ValueError`. Raised when an observed frame is empty, cannot be decoded, has the wrong image format, or has geometry (width × height) that does not match the expected desktop configuration. In warm-pool workflows, this signals that a candidate sandbox produced an invalid first frame and should be rejected.
+
+```python
+from modal_computer_use import FrameValidationError
+
+try:
+    validate_first_frame(payload, expected_width=1280, expected_height=800, image_format="png")
+except FrameValidationError as exc:
+    # The warm-pool candidate's first frame is invalid.
+    # Discard this candidate and try the next slot.
+    print(f"Frame rejected: {exc}")
+```
+
+---
+
+## Configuration and validation errors
+
+### `BrowserReadinessError`
+
+A subclass of both `ComputerUseError` and `RuntimeError`. Raised when the configured browser fails to reach its required ready state within the prewarm window. This exception is specifically used in warm-pool browser validation workflows; it is compatible with `RuntimeError` so that orchestration can distinguish expected candidate rejection from unrelated programming errors.
+
+```python
+from modal_computer_use import BrowserReadinessError
+
+try:
+    # Prewarm a warm-pool candidate with browser validation
+    await computer.browser.status()
+except BrowserReadinessError as exc:
+    # The browser did not become ready in time.
+    # Discard this warm-pool candidate.
+    print(f"Browser prewarm failed: {exc}")
+```
+
+<Tip>
+Both `BrowserReadinessError` and `FrameValidationError` are designed to be compatible with standard Python base classes (`RuntimeError` and `ValueError` respectively). This means orchestration code can use `isinstance(exc, RuntimeError)` or `isinstance(exc, ValueError)` to distinguish expected warm-pool candidate rejection from unexpected programming errors in the same `except` block.
+</Tip>
+
+---
+
+## Exception hierarchy
+
+```
+ComputerUseError
+├── ConfigurationError
+│   └── ConfigConflictError
+├── AuthenticationError
+├── BrowserReadinessError          (also RuntimeError)
+├── FrameValidationError           (also ValueError)
+├── DaemonHTTPError
+├── UnsupportedActionError
+├── ActionValidationError
+├── ArtifactPathError              (also ValueError)
+├── BudgetExceededError
+├── ModalNotInstalledError
+├── SandboxUnavailableError
+│   └── SandboxAmbiguousError
+└── SessionBorrowError
+    ├── SessionCompatibilityError
+    │   ├── SessionEnvironmentMismatchError
+    │   └── SessionPlacementMismatchError
+    ├── SessionTargetMismatchError
+    ├── SessionBusyError
+    ├── SessionLeaseLostError
+    ├── RunSequenceConflictError
+    ├── ActionOutcomeUnknownError
+    ├── OperationResultUnavailableError
+    ├── OperationNotAppliedError
+    └── SessionRecoveryRequiredError
+```
+
+<Note>
+`SessionBorrowError` subclasses intentionally redact all constructor arguments. Their `str()` representation and message are fixed generic strings that never contain sandbox IDs, session IDs, endpoint URLs, or bearer tokens.
+</Note>

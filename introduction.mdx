@@ -1,0 +1,110 @@
+---
+title: "modal-computer-use: Remotely Control Linux Desktops from Python"
+sidebarTitle: "Introduction"
+description: "modal-computer-use is a Python SDK that turns a Modal Sandbox into a remotely controllable Linux desktop for AI agents and automation."
+---
+
+`modal-computer-use` is a typed, provider-neutral Python SDK that turns a [Modal Sandbox](https://modal.com/docs/guide/sandbox) into a fully controllable Linux desktop. You write ordinary Python — move the mouse, type text, open a browser, take a screenshot — and the SDK translates every call into authenticated HTTP requests to a daemon running inside the Sandbox. The result is a reproducible, isolated desktop environment that any Python script or AI agent can drive remotely, without managing virtual machines, VNC servers, or cloud infrastructure by hand.
+
+## Why modal-computer-use?
+
+Building browser automation or computer-use agents today means wiring together a cloud VM, an X server, a VNC daemon, a screenshot pipeline, and a browser — then keeping all of it running reliably. `modal-computer-use` collapses that stack into a single Python import. You get a desktop that starts in seconds, scales to zero when you're done, and exposes every primitive you need through a clean, typed API.
+
+The SDK is intentionally provider-neutral. It does not import `openai` or `anthropic`, does not embed a model loop, and does not hardcode any prompt format. You supply the model and the task; the SDK supplies the desktop primitives.
+
+## How it works
+
+When you call `ComputerSandbox.create()`, the SDK starts a Modal Sandbox and launches an HTTP daemon inside it. That daemon supervises the full Linux desktop stack — an X11 display server, a window manager, an optional Chromium or Firefox browser — and exposes every primitive through a versioned REST API. The SDK client on your side translates Python method calls into authenticated requests to the daemon, then deserializes the typed responses back into Python models.
+
+```
+Your Python code
+      │
+      ▼
+  SDK client  (ComputerSandbox / AsyncComputerSandbox)
+      │  authenticated HTTP
+      ▼
+  Daemon (port 8080 inside the Modal Sandbox)
+      │
+      ▼
+  Linux desktop  (Xvfb · XFCE · Chromium/Firefox · ffmpeg · xclip)
+```
+
+The four layers are:
+
+1. **SDK layer** — `ComputerSandbox` and `AsyncComputerSandbox` handle Modal provisioning, connection management, and expose typed namespaces for every desktop capability.
+2. **Daemon layer** — A FastAPI HTTP server that runs inside the Sandbox on port 8080. It validates actions, serializes desktop input under a lock, captures screenshots, manages recordings, and writes artifacts.
+3. **Desktop stack** — `Xvfb` provides the X11 display. XFCE (or Openbox) manages windows. `x11vnc` and noVNC provide optional remote viewing.
+4. **Modal Sandbox** — The cloud execution environment. Modal handles scheduling, networking, and lifecycle. The SDK issues Connect Tokens for authenticated tunnel access.
+
+## Key capabilities
+
+<CardGroup cols={2}>
+  <Card title="Mouse & Keyboard" icon="computer-mouse">
+    Move, click, drag, scroll, type text, press key combinations, hold modifier keys, and release all held inputs. Native XTest/XKB input with `xdotool` as a compatibility fallback.
+  </Card>
+  <Card title="Screenshots" icon="camera">
+    Capture full-screen or region screenshots with optional cursor overlay, zoom, and coordinate-space metadata. Returns a typed `Screenshot` model with width, height, SHA-256, and raw bytes.
+  </Card>
+  <Card title="Browser Automation" icon="globe">
+    Launch Chromium or Firefox, navigate to URLs, and inspect browser readiness. Configure prewarm, custom launch arguments, GPU mode, and a persistent profile directory.
+  </Card>
+  <Card title="Screen Recordings" icon="video">
+    Start, stop, list, and download MP4 screen recordings captured by `ffmpeg`. Recordings are stored as artifacts and include duration, size, and SHA-256 metadata.
+  </Card>
+  <Card title="Artifacts & Files" icon="folder-open">
+    Read, write, upload, download, list, and sync files inside the Sandbox filesystem. Mount a Modal Volume for persistent storage across sessions.
+  </Card>
+  <Card title="Shell Commands" icon="terminal">
+    Run arbitrary shell commands inside the Sandbox through `computer.commands.run()`. Output is serialized under the daemon input lock to prevent conflicts with GUI tools.
+  </Card>
+  <Card title="Action Batches" icon="list-check">
+    Send ordered sequences of actions in a single request with per-action timeouts, `continue_on_error` control, and an optional trailing screenshot — all validated before execution begins.
+  </Card>
+  <Card title="Clipboard" icon="clipboard">
+    Read, write, and clear the X11 clipboard through `computer.clipboard`. Useful for transferring large text into applications without keystroke simulation.
+  </Card>
+</CardGroup>
+
+## Entry points
+
+The SDK provides two primary entry points depending on whether your code runs synchronously or asynchronously.
+
+**`ComputerSandbox`** is the synchronous entry point. Use it in scripts, Jupyter notebooks, and any context where you don't need an async event loop. Call `ComputerSandbox.create()` as a context manager and the SDK provisions, connects, and cleans up automatically:
+
+```python
+from modal_computer_use import ComputerConfig, ComputerSandbox
+
+with ComputerSandbox.create(config=ComputerConfig()) as computer:
+    screenshot = computer.screenshots.full()
+    screenshot.save("screenshot.png")
+```
+
+**`AsyncComputerSandbox`** is the native-async entry point. Use it in `asyncio` applications, deployed Modal Functions, and agent frameworks that require non-blocking I/O. Its `create()`, `attach()`, and `attach_or_create()` class methods return lazy async context managers — no Modal work happens until you `async with` them:
+
+```python
+from modal_computer_use import AsyncComputerSandbox, ComputerConfig
+
+async with AsyncComputerSandbox.create(config=ComputerConfig()) as computer:
+    screenshot = await computer.screenshots.full()
+```
+
+Both entry points expose the same typed namespaces: `computer.mouse`, `computer.keyboard`, `computer.browser`, `computer.screenshots`, `computer.recordings`, `computer.artifacts`, `computer.commands`, and more. The sync and async surfaces are intentionally parallel so you can migrate between them without relearning the API.
+
+## Named desktops and session handoff
+
+Beyond simple create-and-destroy, `modal-computer-use` supports persistent named desktops and session handoff across Modal Functions.
+
+`ComputerSandbox.attach_or_create(name="my-desktop")` acquires a live named Sandbox if one exists, or creates it if not. Subsequent calls with the same name reconnect to the same running desktop — useful for multi-step workflows where you want to preserve browser state or application context between invocations.
+
+`ComputerSandbox.session_handle()` returns a serializable `ComputerSessionHandle` that you can pass to a deployed Modal Function. The Function calls `handle.borrow_async(run_id=..., function_region=...)` to connect to the already-running desktop for one trajectory, then disconnects without terminating it. This pattern lets you separate desktop provisioning from task execution.
+
+## What's next
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Launch a desktop, open a browser, and take your first screenshot in five minutes.
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Install the SDK and configure your Modal credentials.
+  </Card>
+</CardGroup>

@@ -1,0 +1,201 @@
+---
+title: "Manage Files and Persist Artifacts in Modal Desktops"
+sidebarTitle: "Artifacts & Storage"
+description: "Upload, download, and manage files in the modal-computer-use artifact store, and persist them across sessions using Modal Volume v2."
+---
+
+Every `modal-computer-use` Sandbox has a built-in artifact store — a directory inside the Sandbox filesystem where the daemon reads and writes files on your behalf. You can upload files from your local machine, download results, inspect manifests, and, with a Modal Volume v2, persist artifacts durably across Sandbox sessions. This guide covers the full `computer.artifacts` namespace and the `StorageConfig` settings that control where artifacts live.
+
+## The artifact store
+
+Artifacts are files stored under the daemon's artifact root, which defaults to `/home/desktop/artifacts`. You configure this path with `StorageConfig.artifacts_dir`. All artifact paths you pass to the API are relative to this root.
+
+```
+/home/desktop/artifacts/          ← artifact root (artifacts_dir)
+├── runs/
+│   └── my-run-id/
+│       ├── result.txt
+│       └── screenshot.png
+└── browser-profile/
+    └── Default/
+```
+
+## Listing artifacts
+
+`computer.artifacts.list()` returns the names of all files currently in the artifact store:
+
+```python
+files = computer.artifacts.list()
+for name in files:
+    print(name)
+```
+
+## Reading and writing bytes
+
+`computer.artifacts.read_bytes(path)` returns the raw bytes of a stored file:
+
+```python
+data = computer.artifacts.read_bytes("runs/my-run/result.txt")
+print(data.decode())
+```
+
+`computer.artifacts.write_bytes(path, data, content_type)` writes bytes to the artifact store, creating parent directories as needed:
+
+```python
+info = computer.artifacts.write_bytes(
+    "runs/my-run/result.txt",
+    b"hello\n",
+    "text/plain",
+)
+print(info.kind)          # "file"
+print(info.content_type)  # "text/plain"
+print(info.size_bytes)    # 6
+```
+
+## Downloading and uploading files
+
+`computer.artifacts.download(path, local_path)` copies a file from the artifact store to your local filesystem:
+
+```python
+from pathlib import Path
+
+computer.artifacts.download(
+    "runs/my-run/result.txt",
+    Path("local-output/result.txt"),
+)
+```
+
+`computer.artifacts.upload(local_path, path)` copies a file from your local filesystem into the artifact store:
+
+```python
+computer.artifacts.upload(
+    Path("local-input/config.json"),
+    "config/run-config.json",
+)
+```
+
+Artifact uploads are streamed and are not subject to the 16 MiB JSON request-body ceiling that applies to other routes.
+
+## Deleting artifacts
+
+`computer.artifacts.delete(path)` removes a single file from the artifact store:
+
+```python
+computer.artifacts.delete("runs/my-run/temp-file.txt")
+```
+
+## Artifact manifest
+
+`computer.artifacts.manifest()` returns a detailed listing that includes file sizes and hashes for every artifact. Use it when you need to verify integrity or build a diff against a known set:
+
+```python
+manifest = computer.artifacts.manifest()
+for entry in manifest.entries:
+    print(entry.path, entry.size_bytes, entry.sha256)
+```
+
+## Syncing to a Modal Volume
+
+By default, `computer.artifacts.sync()` is a no-op that reports `persistent=False` — artifacts live only in the Sandbox filesystem and are lost when the Sandbox terminates.
+
+To persist artifacts, configure `StorageConfig(persist_artifacts=True)` and mount a Modal Volume v2 at `artifacts_dir` when creating the Sandbox. After that, `sync()` runs Modal's documented `sync <artifacts_dir>` mountpoint commit inside the Sandbox and reports `ok=True` and `persistent=True` when it succeeds:
+
+```python
+sync = computer.artifacts.sync()
+if not sync.ok or not sync.persistent:
+    raise RuntimeError("Artifact sync to Modal Volume failed")
+print(f"Sync ok: {sync.ok}, persistent: {sync.persistent}")
+```
+
+## StorageConfig reference
+
+| Field | Default | Description |
+|---|---|---|
+| `artifacts_dir` | `/home/desktop/artifacts` | Daemon artifact root. Set on `COMPUTER_USE_ARTIFACTS_DIR`. |
+| `recordings_dir` | `/home/desktop/recordings` | Recording output directory. Set on `COMPUTER_USE_RECORDINGS_DIR`. |
+| `trace_dir` | `/home/desktop/artifacts/traces` | Action trace NDJSON directory. Set on `COMPUTER_USE_TRACE_DIR`. |
+| `persist_artifacts` | `False` | When `True`, creation requires a Modal Volume v2 mounted at `artifacts_dir` or a parent, and `sync()` runs a real Volume commit. |
+
+## Reloading the Volume in other readers
+
+After you call `sync()`, other processes that already have the same Volume mounted must reload it before they can see the new files. The SDK exposes `computer.reload_volumes()` for this:
+
+```python
+computer.reload_volumes(timeout=55)  # uses Modal 1.5.2 blocking reload
+```
+
+## Artifact byte budget
+
+You can cap the total bytes that may be written to the artifact store with `budgets.max_artifact_bytes` in `ComputerConfig`:
+
+```python
+from modal_computer_use import BudgetConfig, ComputerConfig
+
+config = ComputerConfig(
+    budgets=BudgetConfig(max_artifact_bytes=50 * 1024 * 1024),  # 50 MiB cap
+)
+```
+
+The daemon projects the artifact size accounting for replacement of an existing file before accepting a write. Writes that would exceed the budget are rejected before any data is stored.
+
+## Full example: persisting a run artifact
+
+The [`examples/volume_artifacts.py`](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/volume_artifacts.py) example is the complete opt-in Volume v2 workflow:
+
+```python
+import uuid
+import modal
+from modal_proto import api_pb2
+from modal_computer_use import ComputerConfig, ComputerSandbox, StorageConfig
+
+ARTIFACTS_DIR = "/home/desktop/artifacts"
+
+# Create or reference a Volume v2
+volume = modal.Volume.from_name(
+    "computer-use-artifacts",
+    create_if_missing=True,
+    version=api_pb2.VolumeFsVersion.Value("VOLUME_FS_VERSION_V2"),
+).hydrate()
+
+# Unique path for this run
+suffix = uuid.uuid4().hex
+run_id = f"volume-artifacts-{suffix}"
+artifact_path = f"runs/{suffix}/example.txt"
+
+computer = ComputerSandbox.create(
+    config=ComputerConfig(
+        run_id=run_id,
+        storage=StorageConfig(persist_artifacts=True),
+    ),
+    volumes={ARTIFACTS_DIR: volume},
+    wait=False,
+)
+try:
+    computer.wait_until_ready()
+
+    info = computer.artifacts.write_bytes(artifact_path, b"hello\n", "text/plain")
+    sync = computer.artifacts.sync()
+    if not sync.ok or not sync.persistent:
+        raise RuntimeError("Verified Modal Volume artifact sync did not succeed")
+
+    print({
+        "artifact_kind": info.kind,
+        "content_type": info.content_type,
+        "size_bytes": info.size_bytes,
+        "sync_ok": sync.ok,
+        "persistent": sync.persistent,
+    })
+finally:
+    computer.terminate(wait=True)
+    computer.detach()
+```
+
+Run it with:
+
+```bash
+uv run python examples/volume_artifacts.py --volume-name computer-use-artifacts
+# Pass --create-volume if the Volume does not exist yet
+uv run python examples/volume_artifacts.py --volume-name computer-use-artifacts --create-volume
+```
+
+The example deliberately retains the caller-owned Volume and its persisted data. Manage or delete the Volume separately when its data is no longer needed.

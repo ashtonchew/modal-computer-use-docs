@@ -1,0 +1,340 @@
+---
+title: "Keep Desktops Warm with modal-computer-use Warm Pools"
+sidebarTitle: "Warm Pool"
+description: "Use WarmPoolPolicy to pre-provision Modal desktop sandboxes and eliminate cold-start latency for time-sensitive computer-use workloads."
+---
+
+A warm pool is a set of pre-provisioned Modal desktop sandboxes that are ready and waiting before any request arrives. Instead of paying the full cold-start cost — sandbox allocation, desktop startup, browser launch, and readiness verification — your application claims a desktop that is already running and verified. This page explains how warm pools work, how to configure them, and how to interpret claim metrics.
+
+## How Warm Pools Work
+
+When you call `manager.fill_warm_pool(config, policy)`, the SDK inspects the existing sandboxes that match your pool name and config identity and creates new ones to bring the total up to `policy.capacity`. Each created sandbox runs through the full startup sequence and is tagged with pool metadata. When you later call `manager.claim_warm_pool(config, policy)`, the SDK finds a valid warm entry, attaches to it, and returns a `WarmPoolClaim` with a live `computer` object ready for your agent loop.
+
+If no warm entry is available (a pool miss), the SDK falls back to a cold sandbox creation and still returns a valid `WarmPoolClaim`. Your code path is identical in both cases — the `metrics.hit` and `metrics.cold_fallback` fields tell you which path was taken.
+
+<Note>
+  Warm capacity eliminates sandbox cold-start latency. It does not reduce warm-path action or screenshot latency once the desktop is claimed. See the [Optimization guide](/production/optimization) for hot-path tuning.
+</Note>
+
+## WarmPoolPolicy
+
+`WarmPoolPolicy` is a frozen dataclass that defines how the pool behaves:
+
+```python
+from modal_computer_use import WarmPoolPolicy
+
+policy = WarmPoolPolicy(
+    pool_name="interactive-firefox",
+    capacity=2,
+    min_remaining_seconds=300,
+)
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `pool_name` | `str` | required | Unique name for this pool. Used as the base for Modal sandbox slot names. Must be alphanumeric with dots, underscores, or hyphens. |
+| `capacity` | `int` | required | Number of warm sandboxes to maintain. Must be between 1 and 100. |
+| `min_remaining_seconds` | `int` | `60` | Minimum remaining sandbox lifetime before a pool entry is considered expired for claim purposes. Prevents claiming a sandbox that will time out before your task completes. |
+| `expiry_skew_seconds` | `int` | `15` | Safety buffer subtracted from the computed remaining time to account for clock skew. |
+| `max_claim_scan` | `int` | `4` | Maximum number of existing sandbox entries to inspect when scanning for a claimable entry. |
+
+### Config Constraints
+
+Warm capacity does not support all `ComputerConfig` options. Before calling `fill_warm_pool` or `claim_warm_pool`, the SDK calls `policy.validate_config(config)`, which enforces:
+
+<Warning>
+  `runtime.idle_timeout_seconds` is not supported for warm capacity. A warm sandbox must have a predictable lifetime determined by `runtime.timeout_seconds` alone. If you set `idle_timeout_seconds`, the call raises `ValueError`.
+
+  Explicit `vnc_password` is also not supported. The SDK generates per-sandbox VNC passwords automatically.
+</Warning>
+
+## Filling and Claiming the Pool
+
+```python
+from modal_computer_use import (
+    BrowserConfig,
+    ComputerConfig,
+    ComputerSandboxManager,
+    ResourceConfig,
+    RuntimeConfig,
+    WarmPoolPolicy,
+)
+import os
+
+def warm_config(*, region: str) -> ComputerConfig:
+    return ComputerConfig(
+        resources=ResourceConfig(profile="browser", cpu=4, memory_mib=8192),
+        browser=BrowserConfig(kind="firefox", prewarm=True),
+        runtime=RuntimeConfig(timeout_seconds=3600, modal_region=region),
+    )
+
+manager = ComputerSandboxManager()
+policy = WarmPoolPolicy(
+    pool_name="interactive-firefox",
+    capacity=2,
+    min_remaining_seconds=300,
+)
+
+region = os.environ["MODAL_COMPUTER_USE_REGION"]
+config = warm_config(region=region)
+
+# Fill the pool to the configured capacity
+fill = manager.fill_warm_pool(config=config, policy=policy)
+print({
+    "configured_capacity": fill.configured_capacity,
+    "existing_count": fill.existing_count,
+    "created_count": fill.created_count,
+})
+```
+
+Call `fill_warm_pool` from a separate provisioning script or scheduled job — not on the request hot path. It is safe to call repeatedly; it only creates sandboxes if the current live count is below `capacity`.
+
+### Claiming a Warm Desktop
+
+```python
+claim = manager.claim_warm_pool(config=config, policy=policy)
+try:
+    print({
+        "pool_hit": claim.metrics.hit,
+        "cold_fallback": claim.metrics.cold_fallback,
+        "claim_elapsed_ms": claim.metrics.claim_elapsed_ms,
+        "remaining_lifetime_seconds": claim.metrics.remaining_lifetime_seconds,
+        "cost_accounting": claim.metrics.cost_accounting,
+    })
+
+    # claim.computer is a ready ComputerSandbox — run your full agent loop here
+    screenshot = claim.computer.screenshots.full_bytes()
+    # ...
+finally:
+    claim.close()
+```
+
+`WarmPoolClaim` also supports the context manager protocol:
+
+```python
+with manager.claim_warm_pool(config=config, policy=policy) as computer:
+    # computer is the live ComputerSandbox
+    screenshot = computer.screenshots.full_bytes()
+    # ...
+# claim.close() is called automatically
+```
+
+<Warning>
+  Do not requeue or re-add the claimed sandbox back to the pool after use. Each warm sandbox is one-shot: claim it, run your trajectory, then let `claim.close()` terminate it. Refill the pool with a fresh `fill_warm_pool` call from your provisioning job.
+</Warning>
+
+## Data Types
+
+### WarmPoolEntry
+
+`WarmPoolEntry` is a frozen snapshot of a warm sandbox's metadata as stored in Modal sandbox tags:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `sandbox_id` | `str` | Modal sandbox ID |
+| `slot_name` | `str` | Slot name within the pool (e.g., `interactive-firefox-000`) |
+| `pool_name` | `str` | Pool name from the policy |
+| `app_name` | `str` | Modal app name |
+| `config_identity` | `str` | SHA-256 prefix of the config used to create this entry |
+| `queue_identity` | `str` | Fill-time identity for ordering |
+| `created_at` | `datetime` | When the sandbox was created |
+| `ready_at` | `datetime` | When the sandbox passed `/readyz` |
+| `expires_at` | `datetime` | When the sandbox will time out |
+| `requested_region` | `str \| None` | Modal region that was requested |
+| `actual_region` | `str \| None` | Modal region where the sandbox actually landed |
+| `cpu` | `float \| None` | CPU request in cores |
+| `memory_mib` | `int \| None` | Memory request in MiB |
+
+### WarmPoolFillResult
+
+Returned by `fill_warm_pool`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `pool_name` | `str` | Pool name from the policy |
+| `config_identity` | `str` | Config identity used for this fill |
+| `requested_region` | `str \| None` | Requested Modal region |
+| `configured_capacity` | `int` | Target capacity from the policy |
+| `existing_count` | `int` | Number of valid warm entries already present |
+| `created_count` | `int` | Number of new sandboxes created in this call |
+| `entries` | `tuple[WarmPoolEntry, ...]` | All entries now in the pool |
+
+### WarmPoolReconcileResult
+
+Returned by `reconcile_warm_pool`, which terminates expired or mismatched entries:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `pool_name` | `str` | Pool name |
+| `inspected_count` | `int` | Total sandboxes examined |
+| `terminated_count` | `int` | Sandboxes terminated in this reconcile |
+| `terminated` | `tuple[tuple[str, str], ...]` | `(sandbox_id, reason)` pairs for each termination |
+| `skipped_count` | `int` | Sandboxes skipped due to invalid metadata |
+
+### WarmPoolClaimMetrics
+
+`claim.metrics` contains operational data about the claim:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `pool_name` | `str` | Pool name |
+| `configured_pool_size` | `int` | Capacity from the policy |
+| `config_identity` | `str` | Config identity used to match entries |
+| `requested_region` | `str \| None` | Requested Modal region |
+| `actual_region` | `str \| None` | Region where the claimed sandbox is running |
+| `hit` | `bool` | `True` if a warm entry was claimed; `False` if cold fallback was used |
+| `claim_elapsed_ms` | `float` | Total time from `claim_warm_pool` call to a ready computer |
+| `cold_fallback` | `bool` | `True` if no warm entry was available and a cold sandbox was created |
+| `request_to_authenticated_ms` | `float` | Time from claim start to successful authentication |
+| `miss_reason` | `str \| None` | Why no warm entry was found, if applicable |
+| `rejection_reasons` | `tuple[str, ...]` | Reasons individual entries were rejected during the scan |
+| `remaining_lifetime_seconds` | `float \| None` | How much of the sandbox lifetime remains at claim time |
+| `cost_accounting` | `dict \| None` | Idle cost estimate for this entry; see cost estimation below |
+| `request_to_first_frame_ms` | `float \| None` | Time from claim to the first verified screenshot frame |
+
+## Config Identity
+
+`pool_config_identity(config)` computes a 24-character SHA-256 prefix over the deterministic JSON representation of a `ComputerConfig`. It excludes `run_id`, `request_id`, and `vnc_password` — fields that are per-request secrets, not compatibility inputs:
+
+```python
+from modal_computer_use.latency import pool_config_identity
+
+identity = pool_config_identity(config)
+# e.g., "a3f9c2d1e8b47f6a92c0d5e1"
+```
+
+The SDK uses this identity to verify that a warm pool entry was created with the same config your application expects. A `config_mismatch` rejection reason means the entry was created with a different config and is not safe to claim for your workload.
+
+## Frame Validation
+
+Before returning a warm claim, the SDK calls `validate_first_frame` to verify that the sandbox is actually serving valid screenshots:
+
+```python
+from modal_computer_use.latency import validate_first_frame
+from modal_computer_use.errors import FrameValidationError
+
+try:
+    validate_first_frame(
+        payload=screenshot_bytes,
+        expected_width=1024,
+        expected_height=768,
+        image_format="png",
+    )
+except FrameValidationError as exc:
+    # This pool candidate is not healthy — reject it
+    print(f"Frame validation failed: {exc}")
+```
+
+`FrameValidationError` is raised when:
+- The frame payload is empty
+- The image cannot be decoded
+- The image format does not match the requested format
+- The image dimensions do not match the configured desktop resolution
+
+Entries that fail frame validation are rejected as pool candidates. If all candidates fail, the SDK falls back to a cold sandbox.
+
+## Cost Estimation
+
+`estimate_warm_idle_cost(entry, claimed_at=..., configured_pool_size=...)` computes the approximate cost of keeping a warm sandbox idle from its `ready_at` timestamp until it was claimed. This uses public Modal rates and the sandbox's CPU and memory metadata:
+
+```python
+from datetime import UTC, datetime
+from modal_computer_use.latency import estimate_warm_idle_cost
+
+cost = estimate_warm_idle_cost(
+    entry=claim.entry,
+    claimed_at=datetime.now(UTC),
+    configured_pool_size=policy.capacity,
+)
+# cost["estimated_cost"]["total"] → float in USD
+# cost["estimated_cost"]["status"] → "estimated" or "partial"
+```
+
+The estimate returns `status="partial"` when CPU or memory metadata is missing. Treat all cost estimates as approximate public-rate context, not billing truth.
+
+## Error Handling
+
+<Accordion title="BrowserReadinessError">
+  Raised when the browser in a warm candidate sandbox is not ready to serve pages. The SDK rejects this entry and continues scanning remaining candidates. If all candidates fail, it falls back to cold creation.
+
+  This can happen when:
+  - Browser prewarm completed but the browser process died before the entry was claimed
+  - The sandbox is near expiry and the browser exited during shutdown
+</Accordion>
+
+<Accordion title="FrameValidationError">
+  Raised by `validate_first_frame` when the first screenshot from a warm candidate does not match the expected resolution or format. The SDK treats this as a candidate rejection.
+
+  Check `FrameValidationError.args[0]` for the specific failure reason: `"first frame is empty"`, `"first frame could not be decoded"`, `"first frame content type does not match the requested format"`, or `"first frame geometry does not match the configured desktop"`.
+</Accordion>
+
+## Complete Example
+
+The following is the complete warm pool example from the SDK repository:
+
+```python
+"""Provision and claim bounded, one-shot Modal warm capacity."""
+
+import os
+
+from modal_computer_use import (
+    BrowserConfig,
+    ComputerConfig,
+    ComputerSandboxManager,
+    ResourceConfig,
+    RuntimeConfig,
+    WarmPoolPolicy,
+)
+
+
+def warm_config(*, region: str) -> ComputerConfig:
+    return ComputerConfig(
+        resources=ResourceConfig(profile="browser", cpu=4, memory_mib=8192),
+        browser=BrowserConfig(kind="firefox", prewarm=True),
+        runtime=RuntimeConfig(timeout_seconds=3600, modal_region=region),
+    )
+
+
+def main() -> None:
+    region = os.environ.get("MODAL_COMPUTER_USE_REGION", "").strip()
+    if not region:
+        raise RuntimeError("set MODAL_COMPUTER_USE_REGION from a current region measurement")
+
+    manager = ComputerSandboxManager()
+    policy = WarmPoolPolicy(
+        pool_name="interactive-firefox",
+        capacity=2,
+        min_remaining_seconds=300,
+    )
+    config = warm_config(region=region)
+
+    # Fill the pool before requests arrive
+    fill = manager.fill_warm_pool(config=config, policy=policy)
+    print({
+        "configured_capacity": fill.configured_capacity,
+        "existing_count": fill.existing_count,
+        "created_count": fill.created_count,
+    })
+
+    # Claim one desktop when a request arrives
+    claim = manager.claim_warm_pool(config=config, policy=policy)
+    try:
+        print({
+            "pool_hit": claim.metrics.hit,
+            "cold_fallback": claim.metrics.cold_fallback,
+            "claim_elapsed_ms": claim.metrics.claim_elapsed_ms,
+            "remaining_lifetime_seconds": claim.metrics.remaining_lifetime_seconds,
+            "cost_accounting": claim.metrics.cost_accounting,
+        })
+        # Run your agent loop on claim.computer
+    finally:
+        claim.close()
+
+
+if __name__ == "__main__":
+    main()
+```
+
+<Tip>
+  Start with `capacity=1` or `capacity=2` and increase only after measuring your actual cold-fallback rate. Each warm sandbox runs continuously and accrues CPU and memory cost from the moment it passes readiness until it is claimed or expires. A pool of five sandboxes with 4 CPU / 8 GiB each can easily cost more than the cold-start latency it saves if your request rate is low.
+</Tip>

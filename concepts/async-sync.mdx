@@ -1,0 +1,325 @@
+---
+title: "Sync vs. Async Interfaces in modal-computer-use"
+sidebarTitle: "Sync vs. Async"
+description: "Choose between ComputerSandbox, AsyncComputerSandbox, and AsyncDaemonClient based on whether your application is synchronous, async, or connecting to an existing daemon."
+---
+
+`modal-computer-use` ships three primary client interfaces. They expose identical desktop-control namespaces — the same `computer.mouse`, `computer.keyboard`, `computer.screenshots`, and so on — but differ in whether they block your thread, whether they provision Modal infrastructure, and how they handle Sandbox lifecycle ownership. Choosing the right interface up front saves you from refactoring later.
+
+## Choosing an interface
+
+<CardGroup cols={3}>
+  <Card title="ComputerSandbox" icon="terminal">
+    **Synchronous.** Blocks the calling thread. Good for scripts, notebooks, and single-threaded automation pipelines.
+  </Card>
+  <Card title="AsyncComputerSandbox" icon="bolt">
+    **Async + Modal provisioning.** Uses Modal's native `.aio` calls throughout. Best for deployed Modal Functions and any async application that creates or attaches to Sandboxes.
+  </Card>
+  <Card title="AsyncDaemonClient" icon="plug">
+    **Async, no Modal provisioning.** Connects to a daemon that is already running. Use this when you manage Sandbox startup separately or work with a local daemon.
+  </Card>
+</CardGroup>
+
+---
+
+## ComputerSandbox — synchronous interface
+
+`ComputerSandbox` is a blocking synchronous client. Every method call waits for the daemon to respond before returning. This makes it straightforward to use in scripts and notebooks where you don't need to keep an event loop alive.
+
+<Tabs>
+  <Tab title="Create (sync)">
+    ```python
+    from modal_computer_use import BrowserConfig, ComputerConfig, ComputerSandbox, ResourceConfig
+
+    config = ComputerConfig(
+        resources=ResourceConfig(profile="browser"),
+        browser=BrowserConfig(kind="chromium"),
+    )
+
+    with ComputerSandbox.create(config=config) as computer:
+        computer.browser.open_url("https://example.com")
+        shot = computer.screenshots.full()
+        shot.save("result.png")
+    # Sandbox terminated on exit.
+    ```
+  </Tab>
+  <Tab title="Attach (sync)">
+    ```python
+    from modal_computer_use import ComputerSandbox
+
+    with ComputerSandbox.attach(sandbox_id="sb-abc123", wait=True) as computer:
+        info = computer.display.info()
+        print(info.width, info.height)
+    # Connection closed; Sandbox keeps running.
+    ```
+  </Tab>
+  <Tab title="Attach or create (sync)">
+    ```python
+    from modal_computer_use import ComputerConfig, ComputerSandbox
+
+    with ComputerSandbox.attach_or_create(
+        name="my-named-desktop",
+        config=ComputerConfig(),
+    ) as computer:
+        computer.mouse.move(320, 240)
+    # Terminates if the SDK created it; keeps running if it attached.
+    ```
+  </Tab>
+</Tabs>
+
+Use `ComputerSandbox` when:
+- You are writing a script or Jupyter notebook.
+- You don't need concurrency — each action happens one at a time.
+- You want the simplest possible code without `async`/`await`.
+
+---
+
+## AsyncComputerSandbox — async interface with Modal provisioning
+
+`AsyncComputerSandbox` wraps all Modal Sandbox operations in `async`/`await`. It uses Modal's native `.aio` calls internally, which means Modal work (creating, attaching, waiting for readiness) never blocks your event loop. Every context is fully ready when it yields.
+
+<Tabs>
+  <Tab title="Create (async)">
+    ```python
+    import asyncio
+    from modal_computer_use import AsyncComputerSandbox, BrowserConfig, ComputerConfig, ResourceConfig
+
+    config = ComputerConfig(
+        resources=ResourceConfig(profile="browser"),
+        browser=BrowserConfig(kind="chromium"),
+    )
+
+    async def main() -> None:
+        async with AsyncComputerSandbox.create(config=config) as computer:
+            await computer.browser.open_url("https://example.com")
+            shot = await computer.screenshots.full()
+            shot.save("result.png")
+        # Sandbox terminated on exit.
+
+    asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Attach (async)">
+    ```python
+    import asyncio
+    from modal_computer_use import AsyncComputerSandbox
+
+    async def inspect() -> None:
+        async with AsyncComputerSandbox.attach(sandbox_id="sb-abc123") as computer:
+            metadata = await computer.session.metadata()
+            print(metadata)
+        # Connection closed; Sandbox keeps running.
+
+    asyncio.run(inspect())
+    ```
+  </Tab>
+  <Tab title="Attach or create (async)">
+    ```python
+    import asyncio
+    from modal_computer_use import AsyncComputerSandbox, ComputerConfig
+
+    async def main() -> None:
+        async with AsyncComputerSandbox.attach_or_create(
+            name="my-named-desktop",
+            config=ComputerConfig(),
+        ) as computer:
+            await computer.mouse.move(320, 240)
+            shot = await computer.screenshots.full()
+
+    asyncio.run(main())
+    ```
+  </Tab>
+</Tabs>
+
+Use `AsyncComputerSandbox` when:
+- You are writing a deployed Modal Function that needs to stay responsive.
+- You run multiple desktop operations concurrently using `asyncio.gather`.
+- You want lifecycle ownership semantics identical to `ComputerSandbox` but without blocking.
+
+<Note>
+`AsyncComputerSandbox` does not expose `wait=False`. Async contexts are always ready when they yield — the readiness polling happens inside the context manager's `__aenter__`.
+</Note>
+
+### Async attachment selectors
+
+Async attachment accepts exactly one Modal selector:
+
+```python
+# By sandbox ID
+async with AsyncComputerSandbox.attach(sandbox_id="sb-abc123") as computer: ...
+
+# By name
+async with AsyncComputerSandbox.attach(name="my-desktop") as computer: ...
+
+# By run ID
+async with AsyncComputerSandbox.attach(run_id="ticket-456") as computer: ...
+```
+
+Direct daemon base URLs are handled by `AsyncDaemonClient`, not `AsyncComputerSandbox`.
+
+---
+
+## AsyncDaemonClient — async client for existing daemons
+
+`AsyncDaemonClient` connects to a daemon that is **already running**, without provisioning any Modal infrastructure. It owns only its pooled HTTP connection and any WebSocket connections; exiting it closes those connections but does not stop the daemon or terminate a Sandbox.
+
+This is the right choice when:
+- The daemon was started externally (by a separate process, a colleague's script, or the local development server).
+- You are working against a local daemon during development.
+- You want to separate daemon lifecycle management from desktop control code.
+
+<Tabs>
+  <Tab title="Local daemon">
+    ```python
+    import asyncio
+    from modal_computer_use import AsyncDaemonClient
+
+    async def main() -> None:
+        async with AsyncDaemonClient.local(token="dev") as computer:
+            await computer.wait_until_ready()
+            await computer.mouse.move(100, 120)
+            shot = await computer.screenshots.full(show_cursor=True)
+            shot.save("local.png")
+        # Daemon connection closed; daemon process still running.
+
+    asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Remote daemon by URL">
+    ```python
+    import asyncio
+    from modal_computer_use import AsyncDaemonClient
+
+    async def main() -> None:
+        async with AsyncDaemonClient(
+            base_url="https://daemon.internal.example.com",
+            token="my-bearer-token",
+        ) as computer:
+            await computer.browser.open_url("https://example.com")
+            shot = await computer.screenshots.full()
+
+    asyncio.run(main())
+    ```
+  </Tab>
+</Tabs>
+
+`AsyncDaemonClient` provides the same typed namespaces (`computer.mouse`, `computer.keyboard`, etc.) as the sandbox clients. The only difference is that lifecycle operations (`computer.lifecycle.start()`, `computer.lifecycle.stop()`) affect the in-Sandbox services — the Sandbox itself is not managed by this client.
+
+---
+
+## Side-by-side comparison
+
+<Tabs>
+  <Tab title="Sync vs. Async">
+    ```python
+    # ── Synchronous ──────────────────────────────────────────────
+    from modal_computer_use import ComputerConfig, ComputerSandbox
+
+    with ComputerSandbox.create(config=ComputerConfig()) as computer:
+        computer.mouse.click(320, 240)
+        shot = computer.screenshots.full()
+
+
+    # ── Asynchronous ─────────────────────────────────────────────
+    import asyncio
+    from modal_computer_use import AsyncComputerSandbox, ComputerConfig
+
+    async def main() -> None:
+        async with AsyncComputerSandbox.create(config=ComputerConfig()) as computer:
+            await computer.mouse.click(320, 240)
+            shot = await computer.screenshots.full()
+
+    asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Modal vs. Daemon client">
+    ```python
+    # ── Modal-provisioned async ───────────────────────────────────
+    import asyncio
+    from modal_computer_use import AsyncComputerSandbox, ComputerConfig
+
+    async def main() -> None:
+        async with AsyncComputerSandbox.create(config=ComputerConfig()) as computer:
+            await computer.mouse.move(100, 100)
+
+    asyncio.run(main())
+
+
+    # ── Existing daemon (no Modal provisioning) ───────────────────
+    import asyncio
+    from modal_computer_use import AsyncDaemonClient
+
+    async def main() -> None:
+        async with AsyncDaemonClient.local(token="dev") as computer:
+            await computer.wait_until_ready()
+            await computer.mouse.move(100, 100)
+
+    asyncio.run(main())
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## HotSessionClient — persistent WebSocket action streams
+
+For high-frequency action loops where per-request HTTP overhead matters, `HotSessionClient` (sync) and `AsyncHotSessionClient` (async) keep a persistent WebSocket open to the daemon. Actions are sent over that single connection, which eliminates TCP connection setup on every call.
+
+```python
+from modal_computer_use import ComputerConfig, ComputerSandbox
+
+with ComputerSandbox.create(config=ComputerConfig()) as computer:
+    # Open a persistent WebSocket session for the inner loop
+    with computer.hot_session() as hot:
+        for i in range(100):
+            hot.mouse.click(100 + i, 200)
+            hot.keyboard.type(f"Step {i}\n")
+```
+
+```python
+import asyncio
+from modal_computer_use import AsyncComputerSandbox, ComputerConfig
+
+async def main() -> None:
+    async with AsyncComputerSandbox.create(config=ComputerConfig()) as computer:
+        async with computer.hot_session() as hot:
+            for i in range(100):
+                await hot.mouse.click(100 + i, 200)
+                await hot.keyboard.type(f"Step {i}\n")
+
+asyncio.run(main())
+```
+
+<Note>
+The daemon supports up to 64 simultaneous hot-session WebSocket connections (configurable via `COMPUTER_USE_MAX_HOT_SESSION_CONNECTIONS`). Each `hot_session()` context consumes one connection slot.
+</Note>
+
+---
+
+## BorrowedComputer — session handoff
+
+`BorrowedComputer` and `AsyncBorrowedComputer` let a Modal Function receive a desktop session that was created by a different owner, execute one complete trajectory, and return — without ever holding lifecycle ownership of the Sandbox. The original owner keeps the Sandbox running; the borrower gets exactly one exclusive lease.
+
+```python
+# In a deployed Modal Function
+async def trajectory(handle, task: str, run_id: str) -> None:
+    async with handle.borrow_async(run_id=run_id, function_region="us-east") as computer:
+        screenshot = await computer.screenshots.full()
+        action = await my_model(task, screenshot)
+        await computer.actions.run([action])
+    # Borrow ends; Sandbox keeps running for the original owner.
+```
+
+Session handoff is covered in depth in the Session Handoff guide. `BorrowedComputer` and `AsyncBorrowedComputer` are one-shot contexts: once entered and exited, they cannot be re-entered with the same `run_id`.
+
+---
+
+## Summary
+
+| Interface | Sync/Async | Provisions Modal? | Owns Sandbox? |
+|---|---|---|---|
+| `ComputerSandbox` | Synchronous | Yes | Yes, when using `create()` |
+| `AsyncComputerSandbox` | Async | Yes | Yes, when using `create()` |
+| `AsyncDaemonClient` | Async | No | Never |
+| `HotSessionClient` / `AsyncHotSessionClient` | Both | No (sub-client) | No |
+| `BorrowedComputer` / `AsyncBorrowedComputer` | Both | No | No — borrows one lease |

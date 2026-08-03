@@ -1,47 +1,198 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "Get started with modal-computer-use in 5 minutes"
+sidebarTitle: "Quickstart"
+description: "Launch a Modal Linux desktop, control the mouse, take a screenshot, and automate a browser in under five minutes with modal-computer-use."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
+This guide walks you through creating a Modal Linux desktop, opening a browser, moving the mouse, and saving a screenshot — all from a single Python script. By the end you'll understand the core lifecycle pattern that every `modal-computer-use` workflow follows.
 
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
+<Note>
+  You need Python 3.12 or later, `uv`, and an authenticated Modal account. If you haven't installed the SDK yet, start with the [Installation guide](/installation).
+</Note>
 
-## Prerequisites
-
-Before you begin, you must have:
-
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
-
-## Get started
+## The quickstart
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
 
-    ```bash
-    npm install your-package
-    ```
-  </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+### Install the SDK
 
-    ```bash
-    your-cli init
-    ```
-  </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+Install `modal-computer-use` with the `[modal]` extra, which bundles the Modal SDK (1.5.2 or later):
 
-    ```bash
-    your-cli start
-    ```
-  </Step>
+```bash
+uv add "modal-computer-use[modal]"
+```
+
+If you prefer pip:
+
+```bash
+pip install "modal-computer-use[modal]"
+```
+
+<Note>
+  The `[modal]` extra is required to create and manage Modal Sandboxes. The base package alone can connect to an already-running daemon but cannot provision new desktops.
+</Note>
+
+### Authenticate with Modal
+
+If you haven't authenticated yet, run:
+
+```bash
+modal token new
+```
+
+This opens a browser window, logs you into Modal, and saves a token locally. If you're working in a CI environment or headless server, use `modal token set` with a token you've generated from the [Modal dashboard](https://modal.com/settings/tokens) instead:
+
+```bash
+modal token set --token-id <your-token-id> --token-secret <your-token-secret>
+```
+
+### Write the script
+
+Save the following as `quickstart.py`:
+
+```python
+from modal_computer_use import (
+    BrowserConfig,
+    ComputerConfig,
+    ComputerSandbox,
+    ResourceConfig,
+)
+
+config = ComputerConfig(
+    resources=ResourceConfig(profile="browser"),
+    browser=BrowserConfig(kind="chromium"),
+)
+
+with ComputerSandbox.create(config=config) as computer:
+    computer.browser.open_url("https://example.com")
+    computer.mouse.move(320, 240)
+    screenshot = computer.screenshots.full()
+    screenshot.save("screenshot.png")
+    print(screenshot.width, screenshot.height, screenshot.sha256)
+```
+
+Here's what each part does:
+
+- **`ComputerConfig`** — The top-level configuration object. You pass it to `ComputerSandbox.create()` to control every aspect of the desktop: resolution, browser, resources, network policy, and more.
+- **`ResourceConfig(profile="browser")`** — Selects a pre-sized compute profile optimised for browser workloads. Modal provisions the Sandbox with the right CPU and memory for Chromium.
+- **`BrowserConfig(kind="chromium")`** — Tells the daemon to launch Chromium during Sandbox startup. The `prewarm=True` default (set automatically) launches the browser before the `with` block begins, so it's ready the moment your code needs it.
+- **`ComputerSandbox.create(config=config)`** — Starts a Modal Sandbox, waits for both the Sandbox network readiness probe and the daemon `/readyz` endpoint, then yields a connected `computer` object.
+- **`computer.browser.open_url("https://example.com")`** — Navigates the pre-warmed Chromium instance to the URL.
+- **`computer.mouse.move(320, 240)`** — Moves the mouse cursor to coordinates (320, 240) on the 1024×768 desktop.
+- **`computer.screenshots.full()`** — Captures the entire desktop and returns a `Screenshot` model with `width`, `height`, `sha256`, and raw PNG bytes.
+- **`screenshot.save("screenshot.png")`** — Writes the screenshot bytes to disk on your local machine.
+
+When the `with` block ends — whether normally or due to an exception — the SDK terminates the Sandbox and closes the connection automatically.
+
+### Run the script
+
+```bash
+uv run python quickstart.py
+```
+
+Modal will start the Sandbox, pull the desktop image, and launch Chromium. The first run takes 30–60 seconds for cold start. Subsequent runs against a pre-warmed pool are faster. When the script finishes, you'll see output like:
+
+```
+1024 768 a3f8c2d1e4b6...
+```
+
+Check your working directory for `screenshot.png` — it should show `example.com` loaded in Chromium.
+
+### Understand what happened
+
+The lifecycle of every `ComputerSandbox.create()` context follows four phases:
+
+1. **Provision** — The SDK calls `modal.Sandbox.create(...)` with the daemon entrypoint and your config. Modal schedules and starts the container.
+2. **Connect** — The SDK obtains a Modal Connect Token for authenticated tunnel access to port 8080 inside the Sandbox, then polls `/readyz` until the daemon and desktop are fully ready.
+3. **Operate** — Your code sends typed HTTP requests to the daemon. Each namespace method (`mouse.move`, `browser.open_url`, `screenshots.full`) maps to a daemon route.
+4. **Terminate** — Exiting the `with` block calls `sandbox.terminate(wait=True)`, which stops the container and frees the Modal allocation. The SDK connection closes after termination.
+
+Attaching to an existing Sandbox with `ComputerSandbox.attach(sandbox_id=...)` follows the same connect-operate pattern, but exiting the `with` block keeps the Sandbox running and only closes the local client connection.
+
 </Steps>
 
-<Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
+## Sending action batches
 
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
+For agent loops and automated workflows, you'll often want to send several actions in one network round-trip. Use `computer.actions.run()` with a list of action dictionaries:
+
+```python
+from modal_computer_use import (
+    BrowserConfig,
+    ComputerConfig,
+    ComputerSandbox,
+    ResourceConfig,
+)
+
+config = ComputerConfig(
+    resources=ResourceConfig(profile="browser"),
+    browser=BrowserConfig(kind="chromium"),
+)
+
+with ComputerSandbox.create(config=config) as computer:
+    computer.browser.open_url("https://example.com")
+
+    # Send a batch of actions and capture a screenshot at the end
+    batch = computer.actions.run(
+        [
+            {"type": "move", "x": 320, "y": 240},
+            {"type": "click", "x": 320, "y": 240},
+        ],
+        screenshot_after=True,
+    )
+
+    # The trailing screenshot is available on the result object
+    if batch.screenshot:
+        batch.screenshot.save("after_click.png")
+        print("Batch succeeded, screenshot saved")
+```
+
+Action batches validate the complete request before any action executes. By default the batch stops at the first error; pass `continue_on_error=True` to let subsequent actions run after a failure. The `screenshot_after=True` flag appends an implicit screenshot to the same request, so you get a single round-trip for actions plus observation.
+
+<Tip>
+  Action batches are the recommended pattern for AI agent loops. Each model step typically produces one batch of actions; sending them together reduces latency and simplifies error handling.
 </Tip>
+
+## Async usage
+
+If your application uses `asyncio`, use `AsyncComputerSandbox` instead. The API is identical — just `await` every operation:
+
+```python
+import asyncio
+
+from modal_computer_use import (
+    AsyncComputerSandbox,
+    BrowserConfig,
+    ComputerConfig,
+    ResourceConfig,
+)
+
+async def main() -> None:
+    config = ComputerConfig(
+        resources=ResourceConfig(profile="browser"),
+        browser=BrowserConfig(kind="chromium"),
+    )
+
+    async with AsyncComputerSandbox.create(config=config) as computer:
+        await computer.browser.open_url("https://example.com")
+        screenshot = await computer.screenshots.full()
+        screenshot.save("screenshot.png")
+        print(screenshot.width, screenshot.height, screenshot.sha256)
+
+asyncio.run(main())
+```
+
+`AsyncComputerSandbox.create()` returns a lazy async context manager. No Modal work happens until you enter the `async with` block.
+
+## What's next
+
+<CardGroup cols={3}>
+  <Card title="Installation" icon="download" href="/installation">
+    Review all install options, extras, and environment setup details.
+  </Card>
+  <Card title="Introduction" icon="book-open" href="/introduction">
+    Understand the full architecture, all namespaces, and the sync vs. async entry points.
+  </Card>
+  <Card title="API Reference" icon="code" href="https://github.com/ashtonchew/modal-computer-use/blob/main/docs/api.md">
+    Read the complete namespace reference and daemon API contract.
+  </Card>
+</CardGroup>

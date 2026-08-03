@@ -1,0 +1,176 @@
+---
+title: "Install modal-computer-use and configure your environment"
+sidebarTitle: "Installation"
+description: "Install the modal-computer-use Python SDK with uv or pip, set up Modal authentication, and choose the right optional extras for your use case."
+---
+
+`modal-computer-use` is published on PyPI and installs with `uv` or `pip`. This page covers system requirements, the available optional extras, Modal authentication, and how to verify a working installation.
+
+## Requirements
+
+<Note>
+  `modal-computer-use` requires **Python 3.12 or later**. Earlier Python versions are not supported. We recommend using `uv` to manage your Python environment — it resolves extras correctly and handles version pinning out of the box.
+</Note>
+
+To run desktops on Modal, you also need a [Modal account](https://modal.com). Modal offers a free tier with enough credits to run the quickstart many times over. See [Authentication](#authentication) below for setup instructions.
+
+## Install the package
+
+Choose the command that matches your use case. Most users who want to create and control Modal desktops should start with the `[modal]` extra.
+
+<CodeGroup>
+
+```bash uv – base package only
+uv add modal-computer-use
+```
+
+```bash pip – base package only
+pip install modal-computer-use
+```
+
+</CodeGroup>
+
+The base package installs the SDK client, daemon server, configuration models, and all HTTP/WebSocket transport dependencies. It can connect to an already-running daemon, but it **cannot** provision new Modal Sandboxes on its own — you need the `[modal]` extra for that.
+
+### With the `[modal]` extra (recommended)
+
+<Warning>
+  To create and manage Modal Sandboxes you **must** install the `[modal]` extra. This extra pins `modal~=1.5.2`, which means **Modal 1.5.2 or later** (within the 1.5 line) is required. If you already have Modal installed at a different version, use `uv` or a virtual environment to keep dependencies isolated.
+</Warning>
+
+<CodeGroup>
+
+```bash uv
+uv add "modal-computer-use[modal]"
+```
+
+```bash pip
+pip install "modal-computer-use[modal]"
+```
+
+</CodeGroup>
+
+### With the `[openai]` extra
+
+Install this extra to use the built-in OpenAI adapter, which translates OpenAI computer-use action payloads into native `modal-computer-use` actions:
+
+<CodeGroup>
+
+```bash uv
+uv add "modal-computer-use[openai]"
+```
+
+```bash pip
+pip install "modal-computer-use[openai]"
+```
+
+</CodeGroup>
+
+This installs `openai>=2.36`. The SDK itself never imports `openai` — the extra is only needed if you use `OpenAIAdapter` or the OpenAI output helpers directly.
+
+### With the `[anthropic]` extra
+
+Install this extra to use the built-in Anthropic adapter, which supports `computer_20241022`, `computer_20250124`, and `computer_20251124` tool versions:
+
+<CodeGroup>
+
+```bash uv
+uv add "modal-computer-use[anthropic]"
+```
+
+```bash pip
+pip install "modal-computer-use[anthropic]"
+```
+
+</CodeGroup>
+
+This installs `anthropic>=0.101`. Like the OpenAI extra, the SDK core never imports `anthropic` — the extra is only needed for the `AnthropicAdapter`.
+
+### Combining extras
+
+You can combine any extras in a single install command:
+
+<CodeGroup>
+
+```bash uv
+uv add "modal-computer-use[modal,openai,anthropic]"
+```
+
+```bash pip
+pip install "modal-computer-use[modal,openai,anthropic]"
+```
+
+</CodeGroup>
+
+## Authentication
+
+`modal-computer-use` provisions desktops on Modal, so you need a Modal account and an authenticated local environment. There are two ways to set this up.
+
+**Interactive login** (recommended for local development):
+
+```bash
+modal token new
+```
+
+This opens your browser, prompts you to log in or sign up, and stores a credential token on disk. All subsequent `modal` and `modal-computer-use` commands in your terminal will use that token automatically.
+
+**Non-interactive setup** (for CI, servers, and containers):
+
+Generate a token from the [Modal settings page](https://modal.com/settings/tokens), then export it:
+
+```bash
+modal token set --token-id <your-token-id> --token-secret <your-token-secret>
+```
+
+You can also set the `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET` environment variables directly if you prefer not to write the token to disk.
+
+<Warning>
+  You must have an active Modal account before running any script that calls `ComputerSandbox.create()`. Unauthenticated calls raise a `ModalNotInstalledError` or a Modal authentication error immediately.
+</Warning>
+
+## Verify the installation
+
+Run this snippet to confirm the SDK is installed and importable, and to check the version:
+
+```python
+import modal_computer_use
+
+print(modal_computer_use.__version__)
+```
+
+To verify that the `[modal]` extra is installed and that your Modal credentials are valid, run:
+
+```python
+from modal_computer_use import ComputerConfig, ComputerSandbox
+
+# This import requires the [modal] extra and valid Modal credentials.
+# It does not start a Sandbox — it only checks that modal is importable.
+import modal
+print("modal version:", modal.__version__)
+print("modal-computer-use ready")
+```
+
+If Modal is missing you'll see:
+
+```
+ImportError: No module named 'modal'
+```
+
+Re-run the install command with the `[modal]` extra to fix that.
+
+<Tip>
+  Run `modal profile current` to confirm which Modal workspace and environment your credentials point to. If you have multiple Modal accounts, use `modal profile switch` to change the active profile.
+</Tip>
+
+## What's next
+
+Now that the SDK is installed and authenticated, move on to the Quickstart to launch your first Modal desktop:
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Launch a desktop, open a browser, and save a screenshot in five minutes.
+  </Card>
+  <Card title="Introduction" icon="book-open" href="/introduction">
+    Understand the architecture, key capabilities, and the sync vs. async entry points.
+  </Card>
+</CardGroup>

@@ -1,0 +1,399 @@
+---
+title: "Configuring a modal-computer-use Desktop Sandbox"
+sidebarTitle: "Configuration"
+description: "Use ComputerConfig and its nested models to control resources, browser, network, storage, actions, and budgets for your Modal desktop sandbox."
+---
+
+All configuration for a `modal-computer-use` desktop lives in a single Pydantic model: `ComputerConfig`. You construct it before calling `ComputerSandbox.create()`, and the SDK maps its fields into Modal Sandbox creation arguments and daemon environment variables for you. You never need to write environment variables by hand. Every sub-model uses `extra="forbid"`, so a typo in a field name raises a validation error immediately rather than silently being ignored.
+
+## The complete configuration tree
+
+```
+ComputerConfig
+├── desktop      → DesktopConfig       (resolution, DPI, window manager)
+├── runtime      → RuntimeConfig       (timeout, idle timeout, Modal region)
+├── resources    → ResourceConfig      (profile, CPU, memory, GPU)
+├── image        → ImageConfig         (inline vs. named image, revision)
+├── network      → NetworkConfig       (block_all, HTTP version, CIDR allowlists)
+├── storage      → StorageConfig       (artifact dir, recordings dir, persistence)
+├── browser      → BrowserConfig|None  (kind, prewarm, launch args, GPU mode)
+├── actions      → ActionConfig        (timeouts, rate limits, input backend)
+└── budgets      → BudgetConfig        (action, screenshot, artifact, recording caps)
+```
+
+Additionally, `ComputerConfig` itself holds:
+
+- `run_id` — an optional correlation ID for the Sandbox lifetime
+- `ingress` — tunnel mode (`"attested-tunnel"`, `"connect"`, or `"tunnel"`)
+- `expose_vnc` — whether to expose a noVNC interface (`"off"`, `"view_only"`, `"control"`)
+- `vnc_password` — the noVNC password (auto-generated when VNC is enabled and this is unset)
+
+---
+
+## DesktopConfig
+
+Controls the virtual display's appearance.
+
+<ParamField path="desktop.resolution" type="tuple[int, int]" default="(1024, 768)">
+  Screen dimensions as `(width, height)` in pixels. Width must be at least `320`, height at least `240`, and total pixels must not exceed 8,294,400 (roughly 4K).
+</ParamField>
+
+<ParamField path="desktop.dpi" type="int" default="96">
+  Display dots-per-inch. Accepted range: `48..240`. Higher values make UI elements appear larger.
+</ParamField>
+
+<ParamField path="desktop.window_manager" type="str" default='"xfce"'>
+  Window manager to launch. Accepted values: `"xfce"` or `"openbox"`. Named images always require `"xfce"`.
+</ParamField>
+
+<ParamField path="desktop.display_depth" type="int" default="24">
+  Color depth in bits per pixel. Accepted range: `8..32`.
+</ParamField>
+
+```python
+from modal_computer_use import ComputerConfig, DesktopConfig
+
+config = ComputerConfig(
+    desktop=DesktopConfig(
+        resolution=(1920, 1080),
+        dpi=120,
+        window_manager="xfce",
+    )
+)
+```
+
+---
+
+## RuntimeConfig
+
+Controls how long the Sandbox lives and where Modal places it.
+
+<ParamField path="runtime.timeout_seconds" type="int" default="3600">
+  Maximum Sandbox lifetime in seconds. Passed directly to Modal. Range: `1..86400`.
+</ParamField>
+
+<ParamField path="runtime.idle_timeout_seconds" type="int | None" default="None">
+  Modal idle timeout in seconds. The Sandbox terminates when no activity is detected for this duration. Range: `1..86400`. Cannot be used with warm-pool capacity.
+</ParamField>
+
+<ParamField path="runtime.readiness_timeout_seconds" type="int" default="120">
+  How long the SDK waits for Modal and daemon readiness before raising a timeout error. Range: `1..900`.
+</ParamField>
+
+<ParamField path="runtime.modal_region" type="str | None" default="None">
+  Requested Modal placement region (e.g. `"us-east"`, `"eu-west"`). `None` lets Modal choose.
+</ParamField>
+
+<ParamField path="runtime.modal_environment" type="str | None" default="None">
+  Modal environment name for `App.lookup`. `None` uses the default environment.
+</ParamField>
+
+```python
+from modal_computer_use import ComputerConfig, RuntimeConfig
+
+config = ComputerConfig(
+    runtime=RuntimeConfig(
+        timeout_seconds=7200,
+        modal_region="us-east",
+        readiness_timeout_seconds=60,
+    )
+)
+```
+
+---
+
+## ResourceConfig
+
+Controls compute resources allocated to the Sandbox.
+
+<ParamField path="resources.profile" type="str" default='"standard"'>
+  Selects the managed image recipe. Accepted values: `"standard"`, `"browser"`, `"browser-gpu"`, `"custom"`. The `"browser"` and `"browser-gpu"` profiles include a pre-installed browser. `"custom"` is for advanced image overrides.
+</ParamField>
+
+<ParamField path="resources.cpu" type="float | None" default="None">
+  CPU request passed to Modal as physical cores. Modal applies a minimum floor of `0.125`. `None` uses the Modal provider default.
+</ParamField>
+
+<ParamField path="resources.memory_mib" type="int | None" default="None">
+  Memory request in MiB. Must be at least `128`. `None` uses the Modal provider default.
+</ParamField>
+
+<ParamField path="resources.gpu" type="str | None" default="None">
+  GPU request string passed directly to Modal (e.g. `"A10G"`). `None` means no GPU.
+</ParamField>
+
+```python
+from modal_computer_use import ComputerConfig, ResourceConfig
+
+config = ComputerConfig(
+    resources=ResourceConfig(
+        profile="browser",
+        cpu=2,
+        memory_mib=4096,
+    )
+)
+```
+
+---
+
+## ImageConfig
+
+Controls which container image the Sandbox uses.
+
+<ParamField path="image.source" type="str" default='"inline"'>
+  `"inline"` builds or selects the SDK's bundled recipe. `"named"` selects a published revision-tagged image.
+</ParamField>
+
+<ParamField path="image.revision" type="str | None" default="None">
+  For `source="named"`: required full 40-character lowercase Git SHA of the image revision to use.
+</ParamField>
+
+<ParamField path="image.environment_name" type="str | None" default="None">
+  For `source="named"`: optional Modal environment name for named-image and app lookup.
+</ParamField>
+
+<Note>
+You can also pass an explicit `image=` object directly to `ComputerSandbox.create()`, which bypasses `image.source` selection entirely.
+</Note>
+
+---
+
+## NetworkConfig
+
+Controls outbound network access, ingress tunneling, and HTTP version.
+
+<ParamField path="network.block_all" type="bool" default="false">
+  When `true`, blocks all outbound network access. Cannot be combined with any allowlist. Requires `ingress="connect"` with VNC disabled.
+</ParamField>
+
+<ParamField path="network.daemon_http_version" type="str" default='"1.1"'>
+  HTTP version used for the daemon's internal transport. `"1.1"` uses Uvicorn/HTTP 1.1. `"2"` uses cleartext HTTP/2 (`h2c`) inside the Sandbox via Hypercorn.
+</ParamField>
+
+<ParamField path="network.outbound_cidr_allowlist" type="list[str] | None" default="None">
+  List of CIDR strings restricting outbound network access to those ranges. Passed to Modal.
+</ParamField>
+
+<ParamField path="network.outbound_domain_allowlist" type="list[str] | None" default="None">
+  List of domain strings restricting outbound network access to those domains. Passed to Modal.
+</ParamField>
+
+```python
+from modal_computer_use import ComputerConfig, NetworkConfig
+
+# Restrict the Sandbox to only reach your internal API
+config = ComputerConfig(
+    network=NetworkConfig(
+        outbound_domain_allowlist=["api.internal.example.com"],
+    )
+)
+```
+
+---
+
+## StorageConfig
+
+Controls where the daemon stores artifacts, recordings, and action traces.
+
+<ParamField path="storage.artifacts_dir" type="str" default='"/home/desktop/artifacts"'>
+  Root path for all artifacts inside the Sandbox. Mapped to `COMPUTER_USE_ARTIFACTS_DIR`.
+</ParamField>
+
+<ParamField path="storage.recordings_dir" type="str" default='"/home/desktop/recordings"'>
+  Path where screen recordings are saved. Mapped to `COMPUTER_USE_RECORDINGS_DIR`.
+</ParamField>
+
+<ParamField path="storage.persist_artifacts" type="bool" default="false">
+  When `true`, the SDK enables persistent artifact storage. Creation requires a Modal Volume mounted at `artifacts_dir` or one of its parents.
+</ParamField>
+
+<ParamField path="storage.trace_dir" type="str" default='"/home/desktop/artifacts/traces"'>
+  Path for NDJSON action trace files. Mapped to `COMPUTER_USE_TRACE_DIR`.
+</ParamField>
+
+---
+
+## BrowserConfig
+
+`browser` defaults to `None`, meaning no browser is selected or prewarmed. Provide a `BrowserConfig` to control which browser starts up and how it's configured.
+
+<ParamField path="browser.kind" type="str | None" default="None">
+  Browser to use. Accepted values: `"firefox"`, `"chromium"`, or `None`. `None` uses `xdg-open` for generic URL opening. Required for `"browser"` and `"browser-gpu"` profiles with named images.
+</ParamField>
+
+<ParamField path="browser.prewarm" type="bool" default="true">
+  When `true`, the browser launches at daemon startup. Set to `false` if you want the browser installed but not yet running.
+</ParamField>
+
+<ParamField path="browser.open_url_on_start" type="str | None" default="None">
+  A URL to open immediately at startup. Takes precedence over blank-page prewarm. Treat this field as secret-bearing — do not log it.
+</ParamField>
+
+<ParamField path="browser.launch_args" type="list[str]" default="[]">
+  Additional command-line arguments passed to the browser at launch.
+</ParamField>
+
+<ParamField path="browser.gpu_mode" type="str | None" default="None">
+  GPU acceleration mode. Accepted values: `"auto"`, `"off"`, `"chromium-vulkan"`. `None` resolves to `"auto"`.
+</ParamField>
+
+```python
+from modal_computer_use import BrowserConfig, ComputerConfig, ResourceConfig
+
+config = ComputerConfig(
+    resources=ResourceConfig(profile="browser"),
+    browser=BrowserConfig(
+        kind="chromium",
+        prewarm=True,
+        open_url_on_start="https://example.com",
+        gpu_mode="auto",
+    ),
+)
+```
+
+---
+
+## ActionConfig
+
+Controls action execution timing, rate limits, and the input backend.
+
+<ParamField path="actions.default_action_timeout_ms" type="int" default="5000">
+  Per-action timeout in milliseconds when neither the action nor the request provides one. Range: `1..300000`.
+</ParamField>
+
+<ParamField path="actions.max_action_timeout_ms" type="int" default="300000">
+  Maximum per-action timeout the daemon will accept. Must be at least `default_action_timeout_ms`. Range: `1..600000`.
+</ParamField>
+
+<ParamField path="actions.max_batch_duration_ms" type="int" default="30000">
+  Hard wall-clock deadline for an entire action batch, including nested actions. Range: `1..600000`.
+</ParamField>
+
+<ParamField path="actions.max_batch_actions" type="int" default="50">
+  Maximum number of actions (including nested) in a single batch. Range: `1..500`.
+</ParamField>
+
+<ParamField path="actions.input_rate_limit_per_sec" type="int" default="20">
+  Rolling one-second cap on desktop-affecting input operations across all routes. `0` disables the limit.
+</ParamField>
+
+<ParamField path="actions.post_action_delay_ms" type="int" default="0">
+  Milliseconds to wait after each UI-mutating action before the next action or `screenshot_after`. Range: `0..10000`.
+</ParamField>
+
+<ParamField path="actions.input_backend" type="str" default='"auto"'>
+  Input adapter to use. `"auto"` prefers the persistent XTest/XKB path and permits fallback. `"xtest"` or `"xdotool"` force a specific backend.
+</ParamField>
+
+<ParamField path="actions.trace_actions" type="bool" default="false">
+  When `true`, the daemon appends NDJSON trace entries for each action to `storage.trace_dir`.
+</ParamField>
+
+---
+
+## BudgetConfig
+
+Sets hard limits on desktop resource consumption for the lifetime of the Sandbox. All budgets default to unlimited (unset). Each configured value must be a positive integer.
+
+<ParamField path="budgets.max_actions" type="int | None" default="None">
+  Maximum number of attempted executable desktop actions.
+</ParamField>
+
+<ParamField path="budgets.max_screenshots" type="int | None" default="None">
+  Maximum number of screenshot operations.
+</ParamField>
+
+<ParamField path="budgets.max_artifact_bytes" type="int | None" default="None">
+  Maximum total bytes in the artifact store (accounting for replacements).
+</ParamField>
+
+<ParamField path="budgets.max_recording_seconds" type="int | None" default="None">
+  Maximum total recorded screen time in seconds.
+</ParamField>
+
+<ParamField path="budgets.max_idle_seconds" type="int | None" default="None">
+  Maximum seconds of inactivity since the last budget-counted operation. Enforced by the daemon independently of Modal's `runtime.idle_timeout_seconds`.
+</ParamField>
+
+---
+
+## Fully assembled example
+
+Here is a complete `ComputerConfig` that shows all sub-models in context:
+
+```python
+from modal_computer_use import (
+    ActionConfig,
+    BrowserConfig,
+    BudgetConfig,
+    ComputerConfig,
+    DesktopConfig,
+    NetworkConfig,
+    ResourceConfig,
+    RuntimeConfig,
+    StorageConfig,
+)
+
+config = ComputerConfig(
+    # Display
+    desktop=DesktopConfig(
+        resolution=(1920, 1080),
+        dpi=96,
+        window_manager="xfce",
+    ),
+    # Modal orchestration
+    runtime=RuntimeConfig(
+        timeout_seconds=3600,
+        readiness_timeout_seconds=90,
+        modal_region="us-east",
+    ),
+    # Compute resources
+    resources=ResourceConfig(
+        profile="browser",
+        cpu=2,
+        memory_mib=4096,
+    ),
+    # Outbound network restriction
+    network=NetworkConfig(
+        outbound_domain_allowlist=["example.com", "api.myapp.com"],
+    ),
+    # File storage
+    storage=StorageConfig(
+        artifacts_dir="/home/desktop/artifacts",
+        recordings_dir="/home/desktop/recordings",
+        persist_artifacts=False,
+    ),
+    # Browser
+    browser=BrowserConfig(
+        kind="chromium",
+        prewarm=True,
+        gpu_mode="auto",
+    ),
+    # Action execution policy
+    actions=ActionConfig(
+        default_action_timeout_ms=5000,
+        max_batch_actions=50,
+        post_action_delay_ms=100,
+        trace_actions=True,
+    ),
+    # Per-session resource caps
+    budgets=BudgetConfig(
+        max_actions=1000,
+        max_screenshots=500,
+        max_recording_seconds=600,
+    ),
+    # VNC access (off by default)
+    expose_vnc="off",
+)
+
+from modal_computer_use import ComputerSandbox
+
+with ComputerSandbox.create(config=config) as computer:
+    computer.browser.open_url("https://example.com")
+    shot = computer.screenshots.full()
+    shot.save("page.png")
+```
+
+<Note>
+`ComputerConfig` rejects unknown fields (`extra="forbid"`). If you supply a field name that doesn't exist, Pydantic raises a `ValidationError` immediately at construction time — before any network call is made.
+</Note>

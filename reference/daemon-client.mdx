@@ -1,0 +1,344 @@
+---
+title: "DaemonClient and AsyncDaemonClient Reference"
+sidebarTitle: "DaemonClient"
+description: "DaemonClient and AsyncDaemonClient connect to an already-running modal-computer-use daemon, providing the full namespace API without Modal provisioning."
+---
+
+`DaemonClient` and `AsyncDaemonClient` connect to an already-running `modal-computer-use` daemon and expose the same typed namespaces (`mouse`, `keyboard`, `screenshots`, etc.) as `ComputerSandbox`, without performing any Modal provisioning. Use these clients when the daemon is already running — either in a Modal sandbox you manage externally, in a local development environment, or inside a deployed Modal Function. Exiting the client closes only its HTTP connections and any WebSocket sessions it opened; it never stops the daemon process or terminates a Modal sandbox.
+
+```python
+import asyncio
+from modal_computer_use import AsyncDaemonClient
+
+async def main() -> None:
+    async with AsyncDaemonClient.local(token="dev") as computer:
+        await computer.wait_until_ready()
+        await computer.mouse.move(100, 120)
+        screenshot = await computer.screenshots.full()
+
+asyncio.run(main())
+```
+
+---
+
+## `DaemonClient`
+
+`DaemonClient` is the synchronous HTTP facade for an already-running daemon. It issues blocking HTTP requests and is suited for scripts, notebooks, and synchronous call sites that already have a daemon URL.
+
+```python
+from modal_computer_use.client import DaemonClient
+
+client = DaemonClient(
+    base_url="http://127.0.0.1:8080",
+    token="my-token",
+    timeout=30.0,
+    http2=False,
+)
+```
+
+<ParamField path="base_url" type="str" required>
+  Full base URL of the running daemon, e.g. `"http://127.0.0.1:8080"` or a Modal tunnel URL.
+</ParamField>
+
+<ParamField path="token" type="str | None">
+  Bearer token sent as `Authorization: Bearer <token>` on every request. Omit for unauthenticated local development daemons.
+</ParamField>
+
+<ParamField path="timeout" type="float" default="30.0">
+  Per-request timeout in seconds.
+</ParamField>
+
+<ParamField path="http2" type="bool" default="False">
+  Enable HTTP/2 multiplexing. Requires the daemon to be configured for HTTP/2.
+</ParamField>
+
+### `client.close()`
+
+Closes the underlying HTTP connection pool. Always call this when you are done with the client if you are not using it as a context manager.
+
+```python
+client = DaemonClient(base_url="http://127.0.0.1:8080")
+try:
+    payload = client.get_json("/readyz")
+finally:
+    client.close()
+```
+
+### Direct connection with `ComputerSandbox.local()`
+
+For convenience, `ComputerSandbox` exposes a `local()` class method that wraps `DaemonClient` and gives you the full namespace API without any Modal provisioning:
+
+```python
+from modal_computer_use import ComputerSandbox
+
+with ComputerSandbox.local(base_url="http://127.0.0.1:8080", token="dev") as computer:
+    computer.wait_until_ready()
+    computer.mouse.move(100, 120)
+    screenshot = computer.screenshots.full()
+```
+
+---
+
+## `AsyncDaemonClient`
+
+`AsyncDaemonClient` is the native async interface to an already-running daemon. All HTTP and WebSocket operations are `await`-able. Use it directly in async applications, or as the backing transport for `ComputerSandbox` and `AsyncComputerSandbox` internally.
+
+```python
+from modal_computer_use import AsyncDaemonClient
+
+client = AsyncDaemonClient(
+    base_url="http://127.0.0.1:8080",
+    token="my-token",
+    timeout=30.0,
+    http2=False,
+)
+```
+
+`AsyncDaemonClient` implements the async context manager protocol. Exiting the context calls `aclose()`, which closes the HTTP transport and all child WebSocket connections (hot session and observation stream clients) owned by this client.
+
+```python
+async with AsyncDaemonClient(base_url="http://127.0.0.1:8080") as client:
+    await client.wait_until_ready()
+    screenshot = await client.screenshots.full()
+# All connections closed on exit — daemon keeps running.
+```
+
+### `AsyncDaemonClient.local(token=None, ...)`
+
+Convenience constructor for local development. Connects to a daemon running on `localhost:8080` by default. All parameters are optional.
+
+```python
+AsyncDaemonClient.local(
+    *,
+    base_url: str = "http://127.0.0.1:8080",
+    token: str | None = None,
+    timeout: float = 30.0,
+    http2: bool = False,
+) -> AsyncDaemonClient
+```
+
+<ParamField path="base_url" type="str" default="http://127.0.0.1:8080">
+  Base URL of the local daemon. Override when you start the daemon on a non-default port.
+</ParamField>
+
+<ParamField path="token" type="str | None">
+  Bearer token for the daemon. Many local dev setups use `"dev"` as a placeholder.
+</ParamField>
+
+```python
+import asyncio
+from modal_computer_use import AsyncDaemonClient
+
+async def main() -> None:
+    async with AsyncDaemonClient.local(token="dev") as computer:
+        await computer.wait_until_ready()
+        await computer.mouse.move(100, 120)
+        screenshot = await computer.screenshots.full()
+
+asyncio.run(main())
+```
+
+### `await client.aclose()`
+
+Closes all connections owned by this client: the HTTP transport pool and any `AsyncHotSessionClient` or `AsyncObservationClient` instances registered as children. Safe to call multiple times.
+
+```python
+await client.aclose()
+```
+
+### `await client.wait_until_ready(timeout, interval)`
+
+Polls the daemon's `/readyz` endpoint until it reports `{"ready": true}` or the timeout expires. Raises `TimeoutError` with diagnostic context if the deadline is reached.
+
+```python
+await client.wait_until_ready(timeout=120.0, interval=0.25)
+```
+
+<ParamField path="timeout" type="float" default="120.0">
+  Maximum seconds to wait. Must be a positive finite number.
+</ParamField>
+
+<ParamField path="interval" type="float" default="0.25">
+  Polling interval in seconds. The final sleep is capped at the remaining time.
+</ParamField>
+
+---
+
+## Action Namespaces
+
+Both `DaemonClient` and `AsyncDaemonClient` expose the same typed namespaces as `ComputerSandbox`. The async versions return awaitables.
+
+| Namespace | Key methods |
+|---|---|
+| `computer.mouse` | `click`, `move`, `drag`, `scroll`, `down`, `up`, `position` |
+| `computer.keyboard` | `type`, `press`, `hotkey`, `hold`, `supported_keys` |
+| `computer.clipboard` | `get_text`, `set_text`, `clear` |
+| `computer.screenshots` | `full`, `region`, `zoom`, `zoom_around` |
+| `computer.recordings` | `start`, `stop`, `list`, `get`, `download`, `delete` |
+| `computer.display` | `info` |
+| `computer.windows` | `list`, `active`, `activate`, `close`, `wait_for` |
+| `computer.actions` | `apply`, `run`, `validate` |
+| `computer.artifacts` | `list`, `read_bytes`, `write_bytes`, `download`, `upload`, `delete`, `manifest`, `sync` |
+| `computer.browser` | `open_url`, `status`, `render_metrics` |
+| `computer.apps` | `launch`, `open_artifact` |
+| `computer.commands` | `run` |
+| `computer.input` | `release_all` |
+| `computer.lifecycle` | `start`, `stop`, `restart`, `status` |
+| `computer.processes` | `status`, `restart`, `logs`, `stderr`, `errors` |
+| `computer.session` | `metadata`, `refresh` |
+| `computer.debug` | `urls`, `vnc_url` |
+
+---
+
+## `HotSessionClient` / `AsyncHotSessionClient`
+
+For low-latency action streams, use a hot session client. A hot session opens a persistent WebSocket connection to the daemon, letting you send action batches and receive screenshots without the per-request HTTP handshake overhead.
+
+### Sync
+
+```python
+from modal_computer_use import ComputerSandbox
+
+computer = ComputerSandbox.local(base_url="http://127.0.0.1:8080")
+with computer.hot_session(timeout=30.0) as session:
+    result = session.run_actions([{"type": "click", "x": 320, "y": 240}])
+    binary_result = session.run_actions_with_raw_screenshot(
+        [{"type": "move", "x": 100, "y": 100}]
+    )
+```
+
+### Async
+
+```python
+import asyncio
+from modal_computer_use import AsyncDaemonClient
+
+async def main() -> None:
+    async with AsyncDaemonClient.local(token="dev") as client:
+        async with client.hot_session(timeout=30.0) as session:
+            result = await session.run_actions(
+                [{"type": "click", "x": 320, "y": 240}]
+            )
+            raw = await session.run_actions_with_raw_screenshot(
+                [{"type": "move", "x": 100, "y": 100}]
+            )
+
+asyncio.run(main())
+```
+
+`client.hot_session()` registers the child session with the parent client. When you call `client.aclose()` (or exit the `async with` block), all registered hot session and observation stream children are closed first.
+
+<ParamField path="timeout" type="float" default="30.0">
+  WebSocket connection and ping timeout in seconds.
+</ParamField>
+
+### Hot session methods
+
+| Method | Description |
+|---|---|
+| `session.ping()` | Send a keepalive ping and return timing metadata. |
+| `session.run_actions(actions)` | Execute an action batch and return `ActionBatchResult`. |
+| `session.run_actions_with_raw_screenshot(actions)` | Execute a batch and return a `HotSessionBinaryResult` containing the raw screenshot bytes. |
+| `session.screenshot_raw(options)` | Capture a raw screenshot without executing any actions. |
+
+---
+
+## `ObservationClient` / `AsyncObservationClient`
+
+Observation streams deliver a continuous frame sequence over WebSocket. Use them to observe the desktop state between or after actions without polling for individual screenshots.
+
+### Async
+
+```python
+import asyncio
+from modal_computer_use import AsyncDaemonClient
+
+async def main() -> None:
+    async with AsyncDaemonClient.local(token="dev") as client:
+        stream = client.observation_stream(fps=5.0, max_frames=10)
+        async with stream:
+            async for frame in stream:
+                print(frame.width, frame.height)
+
+asyncio.run(main())
+```
+
+<ParamField path="fps" type="float" default="5.0">
+  Requested frames per second from the daemon.
+</ParamField>
+
+<ParamField path="max_frames" type="int | None">
+  Stop the stream after this many frames. Omit for an unbounded stream.
+</ParamField>
+
+<ParamField path="idle_timeout_ms" type="int | None">
+  Close the stream if no frame is received within this many milliseconds.
+</ParamField>
+
+<ParamField path="send_unchanged" type="bool" default="False">
+  Whether to deliver frames even when the screen has not changed.
+</ParamField>
+
+<ParamField path="delivery" type='"latest" | "reliable" | None'>
+  Frame delivery policy. `"latest"` drops stale frames; `"reliable"` guarantees delivery order.
+</ParamField>
+
+<ParamField path="delta_mode" type='"auto" | "off" | None'>
+  Enable or disable delta frame compression.
+</ParamField>
+
+<ParamField path="timeout" type="float" default="30.0">
+  WebSocket connection timeout in seconds.
+</ParamField>
+
+---
+
+## Closing Behavior
+
+<Warning>
+  Closing a `DaemonClient` or `AsyncDaemonClient` **never** stops the daemon process or terminates a Modal sandbox. Lifecycle operations (termination, shutdown) must be performed explicitly through `ComputerSandbox.terminate()` or `computer.lifecycle.stop()`.
+</Warning>
+
+When you exit an `async with AsyncDaemonClient(...)` block, the following cleanup sequence runs in order:
+
+1. All registered child `AsyncHotSessionClient` and `AsyncObservationClient` connections are closed.
+2. The HTTP transport connection pool is shut down.
+3. Any cleanup errors are aggregated and re-raised after all connections have been attempted.
+
+---
+
+## Choosing Between the Two Clients
+
+<Tabs>
+  <Tab title="Use AsyncDaemonClient when…">
+    - You are writing async Python (FastAPI, asyncio event loops, async Modal Functions).
+    - You want to use hot sessions or observation streams from an async context.
+    - You are building a service that keeps a persistent daemon connection open.
+
+    ```python
+    import asyncio
+    from modal_computer_use import AsyncDaemonClient
+
+    async def main() -> None:
+        async with AsyncDaemonClient.local(token="dev") as computer:
+            await computer.wait_until_ready()
+            await computer.mouse.move(100, 120)
+            screenshot = await computer.screenshots.full()
+
+    asyncio.run(main())
+    ```
+  </Tab>
+  <Tab title="Use DaemonClient / ComputerSandbox.local() when…">
+    - You are writing synchronous Python (scripts, notebooks, Django views).
+    - You want a simple blocking interface without async setup.
+
+    ```python
+    from modal_computer_use import ComputerSandbox
+
+    with ComputerSandbox.local(base_url="http://127.0.0.1:8080", token="dev") as computer:
+        computer.wait_until_ready()
+        screenshot = computer.screenshots.full()
+        screenshot.save("output.png")
+    ```
+  </Tab>
+</Tabs>

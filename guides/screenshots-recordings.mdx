@@ -1,0 +1,201 @@
+---
+title: "Capture Screenshots and Record Video of the Desktop"
+sidebarTitle: "Screenshots & Recordings"
+description: "Take full-screen, region, or zoom screenshots and record MP4 video of a modal-computer-use desktop session, then download or persist the results."
+---
+
+`modal-computer-use` gives you multiple ways to observe the desktop: full-screen snapshots, cropped regions, zoomed views, trailing screenshots after action batches, and MP4 video recordings of entire sessions. This guide covers every screenshot and recording API, explains when to use each one, and shows you how to download or persist the results.
+
+## Screenshots
+
+### Full-screen screenshots
+
+`computer.screenshots.full()` captures the entire desktop and returns a `Screenshot` object:
+
+```python
+screenshot = computer.screenshots.full()
+
+# Save to disk
+screenshot.save("desktop.png")
+
+# Inspect metadata
+print(screenshot.width)   # pixel width
+print(screenshot.height)  # pixel height
+print(screenshot.sha256)  # hex digest for deduplication or verification
+```
+
+Pass `show_cursor=True` to include the mouse cursor in the capture:
+
+```python
+screenshot = computer.screenshots.full(show_cursor=True)
+```
+
+### Region screenshots
+
+`computer.screenshots.region(x, y, width, height)` captures a rectangular crop of the desktop. Use this when you only care about a specific part of the screen and want to reduce the data transferred:
+
+```python
+# Capture a 400×200 region starting at (100, 50)
+screenshot = computer.screenshots.region(x=100, y=50, width=400, height=200)
+screenshot.save("region.png")
+```
+
+### Zoomed screenshots
+
+`computer.screenshots.zoom(x, y, zoom_factor)` captures a zoomed view centred on `(x, y)`. Use it to inspect small UI elements or read fine-grained text:
+
+```python
+# 3× zoom centred on (320, 240)
+screenshot = computer.screenshots.zoom(x=320, y=240, zoom_factor=3)
+screenshot.save("zoomed.png")
+```
+
+`computer.screenshots.zoom_around(point, ...)` offers the same capability with a named `point` argument for readability:
+
+```python
+screenshot = computer.screenshots.zoom_around(point=(320, 240), zoom_factor=2)
+```
+
+### Trailing screenshots in action batches
+
+Pass `screenshot_after=True` to `computer.actions.run()` to capture the desktop state immediately after the last action, all in one round-trip:
+
+```python
+batch = computer.actions.run(
+    [
+        {"type": "click", "x": 640, "y": 400},
+        {"type": "type",  "text": "hello"},
+    ],
+    screenshot_after=True,
+)
+
+trailing = batch.screenshot  # Screenshot object, or None on failure
+if trailing:
+    trailing.save("after-actions.png")
+```
+
+Budget validation for an oversized `screenshot_after` region fails *before* any batch action executes, protecting you from partial execution.
+
+## Recordings
+
+The SDK can record the desktop session as an MP4 video. Recordings are stored in the Sandbox at `storage.recordings_dir` (default `/home/desktop/recordings`) and can be listed, downloaded, or deleted through the `computer.recordings` namespace.
+
+### Start a recording
+
+```python
+recording = computer.recordings.start(name="demo", fps=12)
+print(recording.id)
+```
+
+Pass a human-readable `name` and an optional `fps` (frames per second). The returned object contains the recording ID you will use to stop and download it.
+
+### Stop a recording
+
+```python
+stopped = computer.recordings.stop(recording.id)
+
+print(stopped.status)      # "completed" when ffmpeg finished cleanly
+print(stopped.size_bytes)  # file size
+print(stopped.duration)    # duration in seconds (if available)
+print(stopped.sha256)      # hex digest
+```
+
+### List recordings
+
+`computer.recordings.list()` returns all recordings stored in the Sandbox, along with their metadata:
+
+```python
+recordings = computer.recordings.list()
+for r in recordings:
+    print(r.id, r.status, r.size_bytes)
+```
+
+### Retrieve a single recording
+
+`computer.recordings.get(name)` fetches the metadata for one recording by name:
+
+```python
+meta = computer.recordings.get("demo")
+print(meta.artifact_uri)
+print(meta.ffmpeg_args)
+```
+
+Recording metadata includes: `output_path`, `artifact_uri`, `size_bytes`, `duration`, `sha256`, `status`, `ffmpeg_args`, `return_code`, `stop_method`, and bounded ffmpeg diagnostics (`stderr_path`, `stderr_tail`, `error`) when a recording fails.
+
+### Download a recording
+
+`computer.recordings.download(name, local_path)` downloads the MP4 file to your local filesystem:
+
+```python
+from pathlib import Path
+
+downloaded = computer.recordings.download(stopped.id, Path("artifacts/demo-recording.mp4"))
+print(downloaded.exists())  # True when the download succeeded
+```
+
+### Delete a recording
+
+`computer.recordings.delete(name)` removes a recording from the Sandbox artifact store:
+
+```python
+computer.recordings.delete("demo")
+```
+
+### Full recording lifecycle example
+
+The [`examples/recording_lifecycle.py`](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/recording_lifecycle.py) example shows the complete start-stop-download workflow:
+
+```python
+from pathlib import Path
+from modal_computer_use import ComputerSandbox
+
+
+def main() -> None:
+    computer = ComputerSandbox.local(token="dev")
+    computer.wait_until_ready()
+
+    recording = computer.recordings.start(name="demo", fps=12)
+    computer.mouse.move(50, 50)
+    stopped = computer.recordings.stop(recording.id)
+    recordings = computer.recordings.list()
+    downloaded = computer.recordings.download(stopped.id, Path("artifacts/demo-recording.mp4"))
+
+    print({
+        "recording_id": stopped.id,
+        "status": stopped.status,
+        "format": stopped.format,
+        "size_bytes": stopped.size_bytes,
+        "downloaded": downloaded.exists(),
+        "recording_count": len(recordings),
+    })
+
+
+if __name__ == "__main__":
+    main()
+```
+
+Run it with:
+
+```bash
+uv run python examples/recording_lifecycle.py
+```
+
+## Observation stream (experimental)
+
+`computer.observation_stream(fps=...)` opens a WebSocket-based frame stream that delivers desktop frames at the requested rate. This is useful for building real-time monitoring or for post-action visual-change detection.
+
+<Warning>
+The observation stream is an **experimental** feature. Its parameters, result interpretation, failure modes, and maturity are subject to change without notice. Do not rely on it for production workloads.
+</Warning>
+
+```python
+with computer.observation_stream(fps=2) as observations:
+    # Experimental: act and wait for the first visual change
+    result = observations._experimental_act_until_visual_change(
+        actions=[{"type": "click", "x": 100, "y": 100}],
+    )
+```
+
+The stream also supports `ObservationClient.act_and_observe(...)` as a behaviour-preserving compatibility name. Neither method establishes semantic application readiness or proves that the next action is safe. See the Alpha visual-change observation guide for full details.
+
+The global cap for observation-stream connections is 16 (configurable via `COMPUTER_USE_MAX_OBSERVATION_CONNECTIONS`).

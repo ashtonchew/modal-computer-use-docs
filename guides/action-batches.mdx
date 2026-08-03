@@ -1,0 +1,251 @@
+---
+title: "Run Action Batches with Timeouts and Idempotency"
+sidebarTitle: "Action Batches"
+description: "Execute ordered desktop action sequences using computer.actions.run(), with per-action timeouts, idempotency keys, continue_on_error, and trailing screenshots."
+---
+
+`computer.actions.run()` is the primary API for executing ordered sequences of desktop actions — mouse moves, clicks, keystrokes, scrolls, and more — in a single request. The daemon validates the full batch before execution begins, respects per-action and whole-batch timeouts, and can capture a trailing screenshot in the same round-trip. This guide covers every aspect of the batch action API, from the available action types through idempotency, error handling, and budget accounting.
+
+## The core batch API
+
+Pass a list of action dicts to `computer.actions.run()`. The daemon validates all actions first, then executes them in order:
+
+```python
+batch = computer.actions.run(
+    [
+        {"type": "move", "x": 320, "y": 240},
+        {"type": "click", "x": 320, "y": 240},
+        {"type": "type", "text": "hello world"},
+    ]
+)
+```
+
+The call returns a batch result object. If any action fails, the batch stops at that action by default and raises an exception. Use `continue_on_error=True` to keep going after a failure.
+
+## Action types
+
+The daemon supports a rich set of action types:
+
+<CardGroup cols={2}>
+  <Card title="Mouse actions">
+    - `move` — move the cursor to `(x, y)`
+    - `click` — click at `(x, y)` with a configurable button and count
+    - `scroll` — scroll at `(x, y)` by `(dx, dy)` ticks
+    - `drag` — drag along a list of points
+  </Card>
+  <Card title="Keyboard actions">
+    - `type` — type a string using the configured input method
+    - `press` — press and release a single key
+    - `hotkey` — press a key combination (e.g. `["ctrl", "c"]`)
+    - `hold_key` — hold a key while nested actions run
+  </Card>
+  <Card title="Desktop actions">
+    - `wait` — pause for `duration_ms` milliseconds
+    - `screenshot` — capture a screenshot as a batch step
+  </Card>
+</CardGroup>
+
+A typical multi-step example that moves, clicks, types, and then takes a trailing screenshot:
+
+```python
+batch = computer.actions.run(
+    [
+        {"type": "move",       "x": 640, "y": 400},
+        {"type": "click",      "x": 640, "y": 400},
+        {"type": "type",       "text": "automation@example.com"},
+        {"type": "press",      "key": "Tab"},
+        {"type": "type",       "text": "my-password"},
+        {"type": "hotkey",     "keys": ["Return"]},
+        {"type": "wait",       "duration_ms": 500},
+    ],
+    screenshot_after=True,
+)
+
+# The trailing screenshot is available immediately after the batch completes
+screenshot = batch.screenshot
+screenshot.save("after-login.png")
+```
+
+## Trailing screenshots with screenshot_after
+
+Pass `screenshot_after=True` to capture the desktop state immediately after the final action. The screenshot is captured inside the same request, so you avoid an extra round-trip:
+
+```python
+batch = computer.actions.run(
+    [{"type": "click", "x": 100, "y": 200}],
+    screenshot_after=True,
+)
+
+if batch.screenshot:
+    print(f"Width: {batch.screenshot.width}, SHA256: {batch.screenshot.sha256}")
+```
+
+`batch.screenshot` is `None` if `screenshot_after=False` (the default) or if the batch fails before reaching the screenshot step. Budget validation for an oversized `screenshot_after` request fails *before* any batch action executes, so you will not end up with partially executed actions on a pixel-budget error.
+
+## Continuing after errors
+
+By default the batch stops at the first failed action. Set `continue_on_error=True` to proceed with later actions even when earlier ones fail:
+
+```python
+batch = computer.actions.run(
+    [
+        {"type": "click", "x": 100, "y": 200},
+        {"type": "type",  "text": "value"},
+        {"type": "press", "key": "Return"},
+    ],
+    continue_on_error=True,
+)
+```
+
+`continue_on_error` applies between top-level batch items. A `hold_key` action is treated as a single compound item — if a nested action inside it fails, the key is released and the `hold_key` item fails before any later nested actions run.
+
+## Per-action timeout overrides
+
+Each action can carry its own `timeout_ms` to override the daemon's default. Timeout precedence is: action-level `timeout_ms` → request-level `max_action_timeout_ms` → daemon default (`COMPUTER_USE_DEFAULT_ACTION_TIMEOUT_MS`, default 5000 ms). Values above the configured maximum (`COMPUTER_USE_MAX_ACTION_TIMEOUT_MS`, default 300 000 ms) are rejected:
+
+```python
+batch = computer.actions.run(
+    [
+        # Quick mouse move — use a tight timeout
+        {"type": "move", "x": 320, "y": 240, "timeout_ms": 1000},
+        # Typing can be slower — give it more time
+        {"type": "type", "text": "long text content", "timeout_ms": 10000},
+    ]
+)
+```
+
+A whole-batch duration cap (`COMPUTER_USE_MAX_BATCH_DURATION_MS`, default 30 000 ms) acts as a hard deadline and stops the batch even when `continue_on_error=True`. Timeout results include `error_code="timeout"` and an output `scope` of `"action"` or `"batch"`.
+
+## Idempotency keys
+
+Pass an `Idempotency-Key` header to make a batch replay-safe. If you submit the same key again, the daemon returns the original complete batch result without re-executing any actions, incrementing budgets, or duplicating trace or artifact writes:
+
+```python
+import uuid
+
+idempotency_key = str(uuid.uuid4())
+
+batch = computer.actions.run(
+    [{"type": "click", "x": 100, "y": 200}],
+    idempotency_key=idempotency_key,
+)
+
+# Submitting the same key again returns the cached result
+replayed = computer.actions.run(
+    [{"type": "click", "x": 100, "y": 200}],
+    idempotency_key=idempotency_key,
+)
+```
+
+<Warning>
+Reusing an idempotency key with a **different** request body returns HTTP 409. Idempotency keys expire after `COMPUTER_USE_IDEMPOTENCY_CACHE_TTL_SECONDS` (default 3600 s). Do not reuse a key for a new, distinct action sequence.
+</Warning>
+
+## hold_key — nested action trees
+
+`hold_key` holds a modifier key while executing a sequence of nested actions. The key is pressed before the first nested action and released after the last one (or immediately after a nested failure):
+
+```python
+batch = computer.actions.run([
+    {
+        "type": "hold_key",
+        "key": "shift",
+        "actions": [
+            {"type": "click", "x": 100, "y": 100},
+            {"type": "click", "x": 300, "y": 200},
+        ],
+    }
+])
+```
+
+Nested `hold_key` trees are preflighted iteratively and fail closed before any execution begins. The default maximum nesting depth is 32 (configurable up to 128 via `COMPUTER_USE_MAX_ACTION_DEPTH`; this limit cannot be disabled). The total action count, including nested actions, counts toward the batch size limit (default 50, maximum 500).
+
+## Pre-flight validation
+
+Use `computer.actions.validate(actions)` to check your action list for errors without executing anything. This is useful when you build action lists programmatically and want to catch mistakes before they reach the daemon:
+
+```python
+issues = computer.actions.validate([
+    {"type": "move", "x": 320, "y": 240},
+    {"type": "click", "x": 320, "y": 240},
+    {"type": "type", "text": "hello"},
+])
+
+if issues:
+    print("Validation errors:", issues)
+else:
+    print("Batch is valid")
+```
+
+## Input rate limiting
+
+The daemon enforces a rolling one-second rate limit on all desktop-affecting mutation routes (mouse, keyboard, clipboard, windows, apps, browser, and commands). The default is 20 actions per second, controlled by `actions.input_rate_limit_per_sec` in `ComputerConfig` (or `COMPUTER_USE_INPUT_RATE_LIMIT_PER_SEC`). Over-limit actions return `rate_limited` without executing:
+
+```python
+from modal_computer_use import ActionsConfig, ComputerConfig
+
+config = ComputerConfig(
+    actions=ActionsConfig(
+        input_rate_limit_per_sec=50,  # allow up to 50 actions/sec
+    ),
+)
+```
+
+Set `input_rate_limit_per_sec=0` to disable rate limiting entirely.
+
+## Budget accounting
+
+The daemon tracks several budgets. Action batches affect them as follows:
+
+| Budget | What counts |
+|---|---|
+| `budgets.max_actions` | Attempted executable desktop actions, including failed and timed-out ones. Validation failures, idempotency replays, screenshots, zooms, and cursor queries do not count. |
+| `budgets.max_screenshots` | Reserved screenshot operations, including `screenshot_after` captures. |
+| `budgets.max_artifact_bytes` | Artifact bytes projected into the artifact store when screenshots or recordings are stored. |
+
+Check the current budget snapshot via `/v1/computer/status`:
+
+```python
+status = computer.status()
+print(status.budgets)
+```
+
+<Note>
+Screenshot and zoom actions count against screenshot and artifact budgets, not the action budget. Cursor-position queries consume no budget at all.
+</Note>
+
+## Full multi-step example
+
+Here is a complete example that opens a URL, fills in a form, submits it, and captures the result:
+
+```python
+from modal_computer_use import BrowserConfig, ComputerConfig, ComputerSandbox, ResourceConfig
+
+config = ComputerConfig(
+    resources=ResourceConfig(profile="browser"),
+    browser=BrowserConfig(kind="chromium", prewarm=True),
+)
+
+with ComputerSandbox.create(config=config) as computer:
+    computer.browser.open_url("https://example.com/login")
+
+    # Give the page a moment to load
+    computer.actions.run([{"type": "wait", "duration_ms": 1000}])
+
+    # Fill in the form and submit, then capture the result
+    batch = computer.actions.run(
+        [
+            {"type": "click", "x": 640, "y": 300},
+            {"type": "type",  "text": "user@example.com"},
+            {"type": "press", "key": "Tab"},
+            {"type": "type",  "text": "s3cr3t"},
+            {"type": "hotkey", "keys": ["Return"]},
+            {"type": "wait",  "duration_ms": 1500},
+        ],
+        screenshot_after=True,
+        continue_on_error=False,
+    )
+
+    batch.screenshot.save("login-result.png")
+    print(f"Screenshot size: {batch.screenshot.width}x{batch.screenshot.height}")
+```

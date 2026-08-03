@@ -1,0 +1,376 @@
+---
+title: "ComputerSandboxManager: List and Manage Sandboxes"
+sidebarTitle: "SandboxManager"
+description: "ComputerSandboxManager provides create, attach, list, find, terminate, and cleanup_expired operations for managing Modal desktop sandbox lifecycles."
+---
+
+`ComputerSandboxManager` is a thin Modal orchestration facade that groups sandbox lifecycle operations under a single, app-scoped object. It does not own a provider loop, policy engine, or prompt state — it is simply a convenient wrapper around `ComputerSandbox` class methods and the underlying `SandboxRegistry`. Use it when you need to create, attach, list, search, terminate, or bulk-clean sandboxes without passing `app_name` to every call.
+
+```python
+from modal_computer_use import ComputerConfig
+from modal_computer_use.manager import ComputerSandboxManager
+
+manager = ComputerSandboxManager(app_name="my-app")
+computer = manager.create(config=ComputerConfig())
+try:
+    screenshot = computer.screenshots.full()
+finally:
+    computer.detach()
+```
+
+---
+
+## Constructor
+
+```python
+ComputerSandboxManager(app_name: str = "modal-computer-use")
+```
+
+<ParamField path="app_name" type="str" default="modal-computer-use">
+  The Modal App name scoping all sandbox operations. Every method on this manager uses this name when looking up or creating Modal resources.
+</ParamField>
+
+---
+
+## Methods
+
+### `manager.create(config, **kwargs)`
+
+Creates a new sandbox under `app_name`. Equivalent to calling `ComputerSandbox.create(app_name=self.app_name, config=config, **kwargs)`.
+
+```python
+def create(
+    self,
+    *,
+    config: ComputerConfig | None = None,
+    **kwargs,
+) -> ComputerSandbox
+```
+
+<ParamField path="config" type="ComputerConfig | None">
+  Desktop configuration. Defaults to `ComputerConfig()`.
+</ParamField>
+
+<ParamField path="**kwargs">
+  All additional keyword arguments are forwarded to `ComputerSandbox.create()`. See the [`ComputerSandbox.create()`](/reference/computer-sandbox#computersandboxcreate) reference for the full parameter list.
+</ParamField>
+
+```python
+from modal_computer_use import ComputerConfig
+from modal_computer_use.manager import ComputerSandboxManager
+
+manager = ComputerSandboxManager(app_name="my-app")
+computer = manager.create(config=ComputerConfig(), wait=True)
+try:
+    screenshot = computer.screenshots.full()
+finally:
+    computer.detach()
+```
+
+---
+
+### `manager.attach(sandbox_id, **kwargs)`
+
+Attaches to an existing sandbox by its Modal sandbox object ID. Equivalent to `ComputerSandbox.attach(sandbox_id=sandbox_id, app_name=self.app_name, **kwargs)`.
+
+```python
+def attach(
+    self,
+    sandbox_id: str,
+    **kwargs,
+) -> ComputerSandbox
+```
+
+<ParamField path="sandbox_id" type="str" required>
+  Modal sandbox object ID (e.g. `"sb-abc123"`).
+</ParamField>
+
+<ParamField path="**kwargs">
+  Additional keyword arguments forwarded to `ComputerSandbox.attach()`. See the [`ComputerSandbox.attach()`](/reference/computer-sandbox#computersandboxattach) reference for all options, including `wait`, `readiness_timeout`, and `ingress`.
+</ParamField>
+
+```python
+computer = manager.attach("sb-abc123", wait=True)
+try:
+    screenshot = computer.screenshots.full()
+finally:
+    computer.detach()
+```
+
+---
+
+### `manager.attach_or_create(name, config, run_id, **kwargs)`
+
+Attaches to a named sandbox or creates one if it does not exist. Equivalent to `ComputerSandbox.attach_or_create(app_name=self.app_name, name=name, config=config, ...)`.
+
+```python
+def attach_or_create(
+    self,
+    *,
+    name: str,
+    config: ComputerConfig | None = None,
+    run_id: str | None = None,
+    **kwargs,
+) -> ComputerSandbox
+```
+
+<ParamField path="name" type="str" required>
+  Modal app-scoped live allocation key.
+</ParamField>
+
+<ParamField path="config" type="ComputerConfig | None">
+  Desktop configuration used for creation and config-hash validation.
+</ParamField>
+
+<ParamField path="run_id" type="str | None">
+  Optional run ID embedded in sandbox tags.
+</ParamField>
+
+```python
+computer = manager.attach_or_create(
+    name="support-desktop",
+    config=ComputerConfig(),
+)
+try:
+    screenshot = computer.screenshots.full()
+finally:
+    computer.detach()
+```
+
+---
+
+### `manager.list(owner=None)`
+
+Lists all sandboxes registered to `app_name`. Returns a list of `SandboxRef` objects. Pass `owner` to filter by the `computer-use.owner` tag.
+
+```python
+def list(
+    self,
+    *,
+    owner: str | None = None,
+) -> list[SandboxRef]
+```
+
+<ParamField path="owner" type="str | None">
+  Filter results to sandboxes whose `computer-use.owner` tag matches this value. Returns all sandboxes when omitted.
+</ParamField>
+
+```python
+sandboxes = manager.list()
+for ref in sandboxes:
+    print(ref.sandbox_id, ref.run_id, ref.created_at)
+
+# Filter by owner
+my_sandboxes = manager.list(owner="team-alpha")
+```
+
+---
+
+### `manager.find_by_run_id(run_id)`
+
+Finds a single sandbox by its `computer-use.run_id` tag. Returns a `SandboxRef` if found, or `None` if no matching sandbox exists.
+
+```python
+def find_by_run_id(self, run_id: str) -> SandboxRef | None
+```
+
+<ParamField path="run_id" type="str" required>
+  The run ID tag value to search for.
+</ParamField>
+
+```python
+ref = manager.find_by_run_id("support-ticket-42")
+if ref:
+    print("Found:", ref.sandbox_id)
+else:
+    print("No sandbox found for that run ID.")
+```
+
+---
+
+### `manager.terminate(sandbox_id)`
+
+Terminates the sandbox with the given ID. Looks up the sandbox via the registry and calls `terminate()` on it.
+
+```python
+def terminate(self, sandbox_id: str) -> None
+```
+
+<ParamField path="sandbox_id" type="str" required>
+  Modal sandbox object ID to terminate.
+</ParamField>
+
+```python
+manager.terminate("sb-abc123")
+```
+
+<Warning>
+  `terminate()` does not wait for the sandbox to stop. The termination request is sent asynchronously. If you need synchronous confirmation, attach to the sandbox first and call `computer.terminate(wait=True)`.
+</Warning>
+
+---
+
+### `manager.cleanup_expired(ttl_seconds, owner=None, dry_run=True)`
+
+Inspects all app-tagged sandboxes and terminates those whose `computer-use.created_at` tag indicates they are older than `ttl_seconds`. Returns a `SandboxCleanupResult` describing what was found, skipped, and (if `dry_run=False`) terminated.
+
+```python
+def cleanup_expired(
+    self,
+    *,
+    ttl_seconds: int,
+    owner: str | None = None,
+    dry_run: bool = True,
+    now: datetime | None = None,
+) -> SandboxCleanupResult
+```
+
+<ParamField path="ttl_seconds" type="int" required>
+  Sandboxes older than this many seconds are considered expired. Must be positive.
+</ParamField>
+
+<ParamField path="owner" type="str | None">
+  Restrict cleanup to sandboxes whose `computer-use.owner` tag matches this value.
+</ParamField>
+
+<ParamField path="dry_run" type="bool" default="True">
+  When `True` (the default), returns the list of candidates without terminating anything. Set to `False` to actually terminate expired sandboxes.
+</ParamField>
+
+<ParamField path="now" type="datetime | None">
+  Reference time used to compute expiry. Defaults to `datetime.now(UTC)`. Override for testing.
+</ParamField>
+
+<Warning>
+  `cleanup_expired()` defaults to `dry_run=True`. You must explicitly pass `dry_run=False` to terminate anything. Always inspect the `SandboxCleanupResult` from a dry run before proceeding.
+</Warning>
+
+<Note>
+  Only sandboxes that carry the `computer-use.app_id` tag and have a valid, parseable `computer-use.created_at` timestamp are eligible for termination. Untagged or legacy sandboxes are always skipped.
+</Note>
+
+<CodeGroup>
+```python Dry run first
+from modal_computer_use.manager import ComputerSandboxManager
+
+manager = ComputerSandboxManager(app_name="my-app")
+
+# Inspect without terminating.
+result = manager.cleanup_expired(ttl_seconds=3600)
+print(f"Would terminate {len(result.candidates)} sandbox(es).")
+for item in result.candidates:
+    print(" -", item.sandbox_id, item.created_at)
+```
+
+```python Actual cleanup
+# After reviewing the dry run, proceed with termination.
+result = manager.cleanup_expired(
+    ttl_seconds=3600,
+    dry_run=False,
+)
+print(f"Terminated: {result.terminated_count}")
+print(f"Skipped: {len(result.skipped)}")
+print(f"Errors: {len(result.errors)}")
+```
+
+```python Scoped cleanup
+# Terminate only sandboxes owned by a specific team.
+result = manager.cleanup_expired(
+    ttl_seconds=7200,
+    owner="team-alpha",
+    dry_run=False,
+)
+```
+</CodeGroup>
+
+---
+
+## `SandboxCleanupResult`
+
+`cleanup_expired()` returns a `SandboxCleanupResult` with the following fields:
+
+<ResponseField name="dry_run" type="bool">
+  Whether this was a dry run.
+</ResponseField>
+
+<ResponseField name="ttl_seconds" type="int">
+  The TTL value used for the cleanup pass.
+</ResponseField>
+
+<ResponseField name="inspected_count" type="int">
+  Total number of sandboxes examined during the cleanup pass.
+</ResponseField>
+
+<ResponseField name="matched_count" type="int">
+  Number of sandboxes that matched the expiry criteria (expired and eligible).
+</ResponseField>
+
+<ResponseField name="terminated_count" type="int">
+  Number of sandboxes actually terminated (always 0 for dry runs).
+</ResponseField>
+
+<ResponseField name="candidates" type="list[SandboxCleanupItem]">
+  Items that matched the expiry criteria. On a dry run these have `status="candidate"`. After a live run, successfully terminated items have `status="terminated"`.
+</ResponseField>
+
+<ResponseField name="skipped" type="list[SandboxCleanupItem]">
+  Items that were inspected but not terminated. Possible `reason` values include:
+  - `"missing_created_at"` — sandbox has no creation timestamp tag
+  - `"invalid_created_at"` — creation timestamp could not be parsed
+  - `"not_expired"` — sandbox is within the TTL window
+  - `"terminate_unavailable"` — sandbox object does not support termination
+</ResponseField>
+
+<ResponseField name="errors" type="list[SandboxCleanupItem]">
+  Items where a termination attempt raised an exception. The `reason` field contains the exception class name.
+</ResponseField>
+
+Each `SandboxCleanupItem` contains:
+
+<ResponseField name="sandbox_id" type="str">
+  Modal sandbox object ID.
+</ResponseField>
+
+<ResponseField name="name" type="str | None">
+  Sandbox name, if one was set.
+</ResponseField>
+
+<ResponseField name="run_id" type="str | None">
+  `computer-use.run_id` tag value.
+</ResponseField>
+
+<ResponseField name="owner" type="str | None">
+  `computer-use.owner` tag value.
+</ResponseField>
+
+<ResponseField name="created_at" type="datetime | None">
+  Sandbox creation timestamp parsed from tags.
+</ResponseField>
+
+<ResponseField name="status" type='"candidate" | "terminated" | "skipped" | "error"'>
+  Outcome for this item.
+</ResponseField>
+
+<ResponseField name="reason" type="str">
+  Human-readable reason string explaining the status.
+</ResponseField>
+
+---
+
+## `SandboxRegistry`
+
+`ComputerSandboxManager` internally uses `SandboxRegistry` to list, find, and validate sandboxes. `SandboxRegistry` is a lower-level helper that wraps Modal's sandbox list and lookup APIs with app-scoping enforcement and tag validation. You do not normally interact with it directly, but it is accessible as `manager.registry` if you need raw sandbox objects or lower-level list operations.
+
+```python
+# Access the underlying registry directly if needed.
+registry = manager.registry
+sandboxes_with_refs = registry.list_sandboxes_with_refs(
+    tags={"computer-use.owner": "team-alpha"}
+)
+for sandbox, ref in sandboxes_with_refs:
+    print(ref.sandbox_id, ref.run_id)
+```
+
+<Note>
+  `SandboxRegistry` enforces that every resolved sandbox carries the `computer-use.app_id` tag matching the manager's `app_name`. This prevents cross-app interference when multiple applications share a Modal workspace.
+</Note>

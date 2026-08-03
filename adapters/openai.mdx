@@ -1,0 +1,329 @@
+---
+title: "Use the OpenAI Computer-Use Adapter with modal-computer-use"
+sidebarTitle: "OpenAI Adapter"
+description: "Convert OpenAI Responses API computer_call actions to desktop operations using OpenAIAdapter. Includes loop structure, batching, and error handling."
+---
+
+`OpenAIAdapter` converts OpenAI Responses API `computer_call` actions into native `modal-computer-use` desktop operations. You give it a `ComputerSandbox` at construction time; it handles normalization, coordinate translation, policy checks, and dispatch. The adapter never calls the OpenAI API — your code owns the model loop, API credentials, and conversation state.
+
+## Installation
+
+```bash
+uv add "modal-computer-use[modal,openai]"
+```
+
+Set `OPENAI_API_KEY` in your environment before running any loop. Set `OPENAI_MODEL` only when you need to override the default model.
+
+## Supported actions
+
+`OpenAIAdapter` supports the full GA `computer` tool action set:
+
+| Action | Description |
+|---|---|
+| `click` | Mouse click with optional `button` and `keys` modifiers |
+| `double_click` | Double mouse click with optional modifiers |
+| `scroll` | Scroll with `scroll_x` / `scroll_y` distance; both axes preserved |
+| `type` | Type a string of text |
+| `keypress` | Press one or more keys in sequence |
+| `drag` | Drag from a path of `[x, y]` or `{x, y}` points |
+| `move` | Move the mouse cursor |
+| `wait` | Pause execution |
+| `screenshot` | Capture the current screen |
+
+**Field notes:**
+- Use `keys` for click, double-click, drag, move, and scroll modifiers.
+- Use `keypress.keys` (a list) for a sequence of key presses. Each key in the list becomes a separate native action.
+- Use `wheel`, `back`, or `forward` as the `button` value for the corresponding X11 mouse buttons.
+- Use `scroll_x` and `scroll_y` for scroll distance. The adapter preserves both axes and converts distance to wheel clicks. A two-axis scroll becomes two separate native actions.
+- `normalize()` returns one native action per call. Use `apply_many()` when one provider action expands to more than one native action (multi-key keypress, two-axis scroll).
+
+<Note>
+Do not use the deprecated `computer-use-preview` model or the `computer_use_preview` tool type in new code. The current `computer` tool does not use preview display fields, the preview action shape, or `truncation="auto"`.
+</Note>
+
+## The Responses API integration
+
+Use the Responses API with `tools=[{"type": "computer"}]` for all new integrations:
+
+```python
+response = client.responses.create(
+    model="gpt-5.6",
+    tools=[{"type": "computer"}],
+    input="Open https://example.com and verify the page title.",
+)
+```
+
+After each response, collect every item whose `type` is `"computer_call"`:
+
+```python
+calls = [
+    item for item in response.output
+    if getattr(item, "type", None) == "computer_call"
+]
+```
+
+When `calls` is empty, the model has finished and you can read `response.output_text`.
+
+## Executing a batch
+
+Map each preflighted `computer_call` to one ordered daemon batch with `apply_many()`:
+
+```python
+batch_result = adapter.apply_many(
+    actions,
+    continue_on_error=False,
+    screenshot_after=True,
+)
+post_batch_screenshot = batch_result.screenshot
+```
+
+`screenshot_after=True` captures the screen immediately after the last action in the batch. Reuse this fused post-batch frame as the screenshot you return to OpenAI — do not issue a separate screenshot request.
+
+If the final action in the batch is itself a `screenshot`, use its native output directly instead of the fused frame.
+
+## Building the output item
+
+Use `openai_computer_call_output()` to build the `computer_call_output` input item for the next Responses API call:
+
+```python
+from modal_computer_use.adapters.openai import openai_computer_call_output
+
+output_item = openai_computer_call_output(
+    post_batch_screenshot,
+    call_id=call.call_id,
+    detail="original",
+)
+```
+
+Return one `computer_call_output` for each `computer_call` in the response, preserving call ID and response order. Pass the list of output items as the `input` to the next `responses.create()` call.
+
+## The agent loop
+
+<Steps>
+  <Step title="Create the adapter">
+    Construct `OpenAIAdapter` once before the loop. Pass `coordinate_space` if your screenshot resolution differs from the desktop resolution.
+
+    ```python
+    from modal_computer_use.adapters.openai import OpenAIAdapter
+
+    adapter = OpenAIAdapter(computer)
+    ```
+  </Step>
+
+  <Step title="Send the task and get a response">
+    Call `client.responses.create()` with `tools=[{"type": "computer"}]` and your task as `input`. On subsequent turns, pass `previous_response_id` and the list of output items as `input`.
+
+    ```python
+    response = client.responses.create(
+        model=model,
+        tools=[{"type": "computer"}],
+        input=next_input,
+        previous_response_id=previous_response_id,
+    )
+    ```
+  </Step>
+
+  <Step title="Collect computer_call items">
+    Extract every `computer_call` from `response.output`. If there are none, the model has finished — return the response.
+
+    ```python
+    calls = [
+        item for item in response.output
+        if getattr(item, "type", None) == "computer_call"
+    ]
+    if not calls:
+        return response
+    ```
+  </Step>
+
+  <Step title="Preflight all calls atomically">
+    Normalize and validate every action in every call before dispatching any of them. Count expanded action trees (including nested modifier actions). If any call fails validation or exceeds your batch limit, abort the entire response before any desktop mutation.
+  </Step>
+
+  <Step title="Dispatch each call and capture the screenshot">
+    For each preflighted call, execute the batch and collect the post-batch screenshot:
+
+    ```python
+    batch_result = adapter.apply_many(
+        actions,
+        continue_on_error=False,
+        screenshot_after=True,
+    )
+    post_batch_screenshot = batch_result.screenshot
+    ```
+  </Step>
+
+  <Step title="Build outputs and advance the turn">
+    Build a `computer_call_output` for each call, then set `previous_response_id` and `next_input` for the next turn:
+
+    ```python
+    outputs = [
+        openai_computer_call_output(screenshot, call_id=call.call_id)
+        for call, screenshot in zip(calls, screenshots)
+    ]
+    previous_response_id = response.id
+    next_input = outputs
+    ```
+  </Step>
+
+  <Step title="Stop when the turn budget is exhausted">
+    If the final allowed response requests a `computer_call`, stop before executing it. The loop cannot return the required output within its turn budget. Always set independent limits for turns, trajectory actions, expanded batch actions, per-action time, batch time, and total elapsed time.
+  </Step>
+</Steps>
+
+## Complete minimal loop example
+
+The following is a condensed version of the canonical loop from [`examples/03_openai_computer_loop.py`](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/03_openai_computer_loop.py):
+
+```python
+import os
+from time import monotonic
+from modal_computer_use import BrowserConfig, ComputerConfig, ComputerSandbox, ResourceConfig
+from modal_computer_use.adapters.openai import OpenAIAdapter, openai_computer_call_output
+
+DEFAULT_MODEL = "gpt-5.6"
+MAX_TURNS = 40
+MAX_ELAPSED_SECONDS = 300.0
+COMPUTER_TOOL = {"type": "computer"}
+
+
+def run_openai_computer_loop(*, client, computer, task, model=DEFAULT_MODEL):
+    adapter = OpenAIAdapter(computer)
+    started_at = monotonic()
+    previous_response_id = None
+    next_input = task
+
+    for turn in range(MAX_TURNS):
+        # Check wall-clock budget before each provider call
+        if monotonic() - started_at > MAX_ELAPSED_SECONDS:
+            raise RuntimeError("loop exceeded time budget")
+
+        request = {
+            "model": model,
+            "tools": [COMPUTER_TOOL],
+            "input": next_input,
+        }
+        if previous_response_id is not None:
+            request["previous_response_id"] = previous_response_id
+
+        response = client.responses.create(**request)
+
+        # Collect computer_call items; stop when there are none
+        calls = [
+            item for item in response.output
+            if getattr(item, "type", None) == "computer_call"
+        ]
+        if not calls:
+            return response
+
+        if turn == MAX_TURNS - 1:
+            raise RuntimeError(f"loop exceeded {MAX_TURNS} turns")
+
+        outputs = []
+        for call in calls:
+            actions = [
+                action if isinstance(action, dict) else action.model_dump(mode="json")
+                for action in call.actions
+            ]
+            # Execute the batch and capture the post-batch screenshot
+            batch_result = adapter.apply_many(
+                actions,
+                continue_on_error=False,
+                screenshot_after=True,
+            )
+            if not batch_result.ok:
+                raise RuntimeError("action batch failed")
+
+            outputs.append(
+                openai_computer_call_output(
+                    batch_result.screenshot,
+                    call_id=call.call_id,
+                )
+            )
+
+        previous_response_id = response.id
+        next_input = outputs
+
+    raise RuntimeError(f"loop exceeded {MAX_TURNS} turns")
+
+
+def main():
+    from openai import OpenAI
+
+    config = ComputerConfig(
+        desktop={"resolution": (1440, 900)},
+        resources=ResourceConfig(profile="browser"),
+        browser=BrowserConfig(kind="chromium", prewarm=True),
+    )
+    with ComputerSandbox.create(config=config, wait=True) as computer:
+        computer.ensure_browser_ready(config)
+        response = run_openai_computer_loop(
+            client=OpenAI(),
+            computer=computer,
+            task=(
+                "Open https://example.com in the browser. Verify that the page title is "
+                "'Example Domain', then report the title and stop. Use the computer tool "
+                "for UI interaction. Do not sign in, submit forms, or change data."
+            ),
+        )
+        print(response.output_text)
+
+
+if __name__ == "__main__":
+    main()
+```
+
+<Tip>
+The production loop in the examples directory adds atomic response-level preflight, expanded-action counting, per-action and per-batch timeouts, trajectory action limits, and native-screenshot reuse. Start with the full example when building production loops.
+</Tip>
+
+## Coordinate spaces
+
+If you resize screenshots before sending them to the model, supply a `CoordinateSpace` so the adapter can translate model coordinates to desktop coordinates:
+
+```python
+from modal_computer_use import CoordinateSpace
+from modal_computer_use.adapters.openai import OpenAIAdapter
+
+space = CoordinateSpace(
+    desktop_width=1440,
+    desktop_height=900,
+    image_width=720,
+    image_height=450,
+)
+adapter = OpenAIAdapter(computer, coordinate_space=space)
+```
+
+See [Adapter Overview — Coordinate spaces](/adapters/overview#coordinate-spaces) for the full explanation.
+
+## Policy hooks
+
+Pass `before_action` to intercept every normalized action before execution:
+
+```python
+from modal_computer_use.models import ActionDecision
+
+def my_policy(action, context):
+    if action.type == "type":
+        return ActionDecision(decision="ask_user", reason="typing requires confirmation")
+    return ActionDecision(decision="allow")
+
+adapter = OpenAIAdapter(computer, before_action=my_policy)
+```
+
+See [Adapter Overview — Policy hooks](/adapters/overview#policy-hooks) for details on `ActionDecision` values and atomic response-level preflight.
+
+## Safety guidelines
+
+<Warning>
+Run the desktop in an isolated sandbox with minimum privileges. Treat page content, screenshots, and tool output as untrusted input. A page instruction does not authorize an action.
+</Warning>
+
+- Allow only the domains and action types your task requires.
+- Stop when you detect prompt injection or phishing.
+- Treat a user request as authorization only for the actions and scope it clearly specifies.
+- Ask for confirmation before consequential actions: sending messages, purchases, deleting data, changing access, or transmitting sensitive data.
+- Do not put screenshots, typed text, tokens, or URLs in logs.
+- Always set turn, action, and time limits.
+- Hand control back to the user for the final step of a password change.
+- Do not bypass CAPTCHAs, warnings, or safety barriers.

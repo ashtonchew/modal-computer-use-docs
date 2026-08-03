@@ -1,0 +1,307 @@
+---
+title: "Troubleshoot Common modal-computer-use Issues"
+sidebarTitle: "Troubleshooting"
+description: "Diagnose and fix common modal-computer-use issues including readiness failures, black screenshots, keyboard input problems, recording errors, and artifact sync failures."
+---
+
+This guide covers the most common problems you will encounter when running `modal-computer-use` in production. Each section focuses on practical diagnosis and the specific fix — not background theory. Start with the category that matches your symptom.
+
+## Readiness Issues
+
+<Accordion title="/healthz passes but /readyz fails">
+  `/healthz` only confirms that the daemon process is alive and accepting TCP connections. `/readyz` runs a full readiness sequence: it checks Xvfb, the native X11 input backend, the window manager, the screenshot pipeline, and noVNC when enabled.
+
+  **Fix:** Poll `/readyz` directly and read the per-check failure list in the response body. The list identifies which specific check failed and why:
+
+  ```bash
+  curl -H "Authorization: Bearer $COMPUTER_USE_TOKEN" \
+    "$COMPUTER_USE_DAEMON_URL/readyz"
+  ```
+
+  A failed readiness response includes a `checks` array with individual pass/fail status for each component. Fix the failing component rather than retrying until the aggregate passes.
+
+  **Note on `xdotool` and `wmctrl` requirements:** `xdotool` remains required while the explicit compatibility typing method and automatic pre-emission fallback are part of the public interface. `wmctrl` is required unless the native EWMH adapter can verify a live, self-referencing `_NET_SUPPORTING_WM_CHECK` owner with listing, activation, and close support.
+</Accordion>
+
+<Accordion title="Sandbox fails readiness on Modal">
+  Modal's `Probe.with_tcp(8080)` only waits for TCP accept. The daemon accepts connections before the desktop is fully up — the process is running and the port is open, but Xvfb, the window manager, and the screenshot pipeline may not be ready yet.
+
+  **Fix:** SDK clients must poll `/readyz` after Modal reports readiness, not just rely on Modal's TCP probe. The SDK does this automatically when you use `ComputerSandbox.create(...)`. If you are attaching to an existing sandbox, call `computer.wait_for_ready()` before proceeding.
+
+  ```python
+  # If attaching manually, always verify readiness
+  computer = await ComputerSandbox.attach(sandbox_id=sb_id, config=config)
+  await computer.wait_for_ready_async()
+  ```
+</Accordion>
+
+<Accordion title="Readiness timeout">
+  The default `runtime.readiness_timeout_seconds` is 120 seconds. If your sandbox consistently times out before the desktop is ready — for example, because a large browser profile or slow image layer is loading — increase the timeout:
+
+  ```python
+  from modal_computer_use import ComputerConfig, RuntimeConfig
+
+  config = ComputerConfig(
+      runtime=RuntimeConfig(readiness_timeout_seconds=300),
+  )
+  ```
+
+  This is a client-side wait deadline, not a daemon configuration. It controls how long the SDK polls `/readyz` before giving up. If the sandbox is healthy but slow to start, increasing this value resolves the timeout.
+</Accordion>
+
+## Desktop Display
+
+<Accordion title="Screenshots come back black or empty">
+  The window manager has not finished drawing when the daemon starts. The X server is running and the process is alive, but no windows have been painted yet.
+
+  **Fix — two options:**
+
+  **Option 1:** Wait for `/readyz` before taking any screenshots. The readiness check verifies the screenshot pipeline and at least one frame is available.
+
+  **Option 2:** If you launch an application and immediately screenshot it, wait for the window to appear first:
+
+  ```python
+  # Launch the app, then wait for its window to be mapped and visible
+  await computer.actions.run_async([
+      {"type": "key", "key": "ctrl+t"},  # example: open new terminal
+  ])
+  await computer.windows.wait_for_async(title_contains="Terminal")
+  screenshot = await computer.screenshots.full_bytes_async()
+  ```
+
+  `windows.wait_for(...)` blocks until a window matching the criteria appears and is mapped. Pair it with a reasonable timeout to avoid hanging indefinitely.
+</Accordion>
+
+<Accordion title="Wrong window manager">
+  If you see an unexpected desktop environment or layout, check `desktop.window_manager` in your config. The supported values are `"xfce"` (default) and `"openbox"`.
+
+  ```python
+  from modal_computer_use import ComputerConfig, DesktopConfig
+
+  config = ComputerConfig(
+      desktop=DesktopConfig(window_manager="xfce"),
+  )
+  ```
+
+  Named images require `"xfce"`. If you are using a named image with `"openbox"`, the sandbox will fail to start.
+</Accordion>
+
+## Keyboard and Input
+
+<Accordion title="Input not appearing in the target window">
+  The target window is not focused. Key events and typing go to whichever window currently has keyboard focus, which may not be the one you intend.
+
+  **Fix:** Activate the target window before sending input:
+
+  ```python
+  # Find and activate the window first
+  windows = await computer.windows.list_async()
+  target = next(w for w in windows if "My App" in w.title)
+  await computer.windows.activate_async(target.window_id)
+
+  # Now send input
+  await computer.actions.run_async([
+      {"type": "type", "text": "hello"},
+  ])
+  ```
+
+  If multiple Xvfb sessions are running, also verify that `DISPLAY` matches the intended session.
+</Accordion>
+
+<Accordion title="Unicode typing issues">
+  XTest injects keycodes, not Unicode code points. Characters not representable by the active XKB keyboard layout cannot be injected directly.
+
+  **Fix:** Use `method="auto"` (the default), which automatically selects the right strategy:
+  - Layout-mapped text uses native XTest keystrokes
+  - Long or unmapped Unicode text uses clipboard paste, then restores the previous clipboard
+
+  ```python
+  await computer.actions.run_async([
+      {"type": "type", "text": "Hello, 世界! 🎉", "method": "auto"},
+  ])
+  ```
+
+  Use `method="clipboard"` to force the clipboard path for all text. Use legacy `method="xdotool"` only when you need explicit compatibility with the older subprocess path.
+</Accordion>
+
+<Accordion title="Wrong input backend in use">
+  To check which backend handled a specific request, inspect the `X-Computer-Use-Input-Backend` response header on a direct mouse request. Window requests return `X-Computer-Use-Window-Backend`; raw screenshots return `X-Computer-Use-Capture-Backend`.
+
+  For process-level state, call `/v1/capabilities`:
+
+  ```bash
+  curl -H "Authorization: Bearer $COMPUTER_USE_TOKEN" \
+    "$COMPUTER_USE_DAEMON_URL/v1/capabilities"
+  ```
+
+  The response includes:
+  - `input_backend_configured` — the requested policy (`auto`, `xtest`, or `xdotool`)
+  - `input_backends_supported` — what is built into the backend
+  - `input_backends_available` — what passed the last readiness probe
+
+  To force the native backend and fail closed if it is unavailable, set `COMPUTER_USE_INPUT_BACKEND=xtest`. To isolate the compatibility path, set it to `xdotool`.
+</Accordion>
+
+<Accordion title="input_may_be_partial error">
+  `input_may_be_partial` means emission may have already started. The action cannot be safely replayed because some input may have already reached the desktop — replaying would duplicate keystrokes or clicks.
+
+  **Fix:** Do not replay the operation through another adapter. Inspect the current desktop state (take a screenshot) to determine what actually happened, then decide whether to continue from the current state or take a corrective action.
+
+  Contrast this with `input_backend_unavailable`, where `details.retry_safe=true` guarantees that emission did not start and the action can safely be retried.
+</Accordion>
+
+<Accordion title="release_all_incomplete after release_all">
+  `input.release_all()` returns `release_all_incomplete` when held keys or buttons cannot be released. The `output.remaining` field lists the controls still tracked as held.
+
+  **Fix:** Stop sending new input until the display or backend problem is resolved and cleanup succeeds. Inspect `output.remaining` to understand what is stuck, then diagnose the underlying display or X11 backend issue before continuing.
+</Accordion>
+
+## Provider Adapters
+
+<Accordion title="Provider actions clicking the wrong location">
+  The screenshot you sent to the model and the desktop the daemon operates on are in different coordinate spaces. If you scaled or cropped the screenshot before sending it to the model, the model's returned coordinates refer to the scaled/cropped space, not the full desktop resolution.
+
+  **Fix:** Pass a `CoordinateSpace` to the adapter that describes the screenshot dimensions you sent to the model. The adapter translates model coordinates back to desktop coordinates before dispatching:
+
+  ```python
+  from modal_computer_use import CoordinateSpace
+  from modal_computer_use.adapters import AnthropicAdapter
+
+  # You sent the model a 512x384 screenshot from a 1024x768 desktop
+  adapter = AnthropicAdapter(
+      computer=computer,
+      coordinate_space=CoordinateSpace(width=512, height=384),
+  )
+  ```
+
+  Always match the `CoordinateSpace` to the actual pixel dimensions of the image you passed to the model.
+</Accordion>
+
+## Recordings
+
+<Accordion title="Recording file is empty or corrupted">
+  ffmpeg was killed before it could flush the MP4 trailer. A recording without a proper trailer cannot be played back.
+
+  **Fix:** Always stop recordings explicitly before terminating the sandbox:
+
+  ```python
+  try:
+      recording = await computer.recordings.start_async()
+      # ... run your agent loop ...
+  finally:
+      result = await computer.recordings.stop_async(recording.recording_id)
+      print(result.metadata)  # check result.error for ffmpeg diagnostics
+  ```
+
+  If a recording is already corrupted, inspect `Recording.error` for ffmpeg's stderr tail. It describes whether the issue was an unclean shutdown, a disk space problem, or an encoding error.
+
+  The daemon stops active recordings during shutdown before desktop processes exit, but a hard sandbox kill (for example, a Modal timeout) bypasses this cleanup.
+</Accordion>
+
+## Artifacts
+
+<Accordion title="sync() returns persistent=false">
+  Artifacts are not being persisted to a Modal Volume. This happens when either:
+  1. `StorageConfig(persist_artifacts=True)` was not set in your `ComputerConfig`
+  2. No Modal Volume is mounted at `storage.artifacts_dir` or one of its parent paths
+
+  **Fix:**
+
+  ```python
+  import modal
+  from modal_computer_use import ComputerConfig, StorageConfig
+
+  artifacts_volume = modal.Volume.from_name("my-artifacts-volume", create_if_missing=True)
+
+  config = ComputerConfig(
+      storage=StorageConfig(persist_artifacts=True),
+  )
+
+  # Mount the volume when creating the sandbox
+  computer = await AsyncComputerSandbox.create(
+      config,
+      volumes={"/home/desktop/artifacts": artifacts_volume},
+  )
+  ```
+
+  The SDK verifies at creation time that a Volume is mounted at the artifacts path when `persist_artifacts=True`. Creation fails with a clear error if the Volume is missing.
+</Accordion>
+
+<Accordion title="Readers not seeing committed artifact data">
+  Modal Volume v2 requires an explicit commit and reload cycle. After `computer.artifacts.sync()` commits data from the sandbox, other containers reading the same Volume must call `reload()` to see the new data.
+
+  **Fix:** Call `computer.reload_volumes()` on reader containers after `sync()` on the writer:
+
+  ```python
+  # Writer side (inside the computer-use sandbox)
+  sync_result = await computer.artifacts.sync_async()
+  print(sync_result.persistent)  # should be True
+
+  # Reader side (in a separate Modal container)
+  artifacts_volume.reload()
+  # Now list or read files from the artifacts directory
+  ```
+
+  Modal Volume v1 is not a supported immediate-sync target for this package. Use run-scoped paths with v1, avoid concurrent writes to the same file, and reload already-mounted reader containers before checking for changes.
+</Accordion>
+
+## Deployment (Modal)
+
+<Accordion title="Cold start latency is too high">
+  New sandboxes pay the full startup cost: Modal allocation, image layer loading, Xvfb startup, window manager initialization, browser launch (if configured), and daemon readiness. On the browser profile, this typically takes 8–12 seconds.
+
+  **Fix:** Use warm pools. Pre-provision desktops before requests arrive so claims complete in 1–3 seconds instead of 8–12:
+
+  ```python
+  from modal_computer_use import WarmPoolPolicy
+
+  policy = WarmPoolPolicy(
+      pool_name="my-pool",
+      capacity=2,
+      min_remaining_seconds=300,
+  )
+  fill = manager.fill_warm_pool(config=config, policy=policy)
+  ```
+
+  See the [Warm Pool guide](/production/warm-pool) for the full pattern, cost implications, and claim metrics.
+</Accordion>
+
+<Accordion title="Concurrent trajectory conflict">
+  The daemon lease prevents overlapping borrows on the same desktop. If two callers try to use the same sandbox simultaneously, the second `borrow()` or `borrow_async()` call will be blocked or rejected.
+
+  **Fix:** Use one trajectory per desktop. For concurrent workloads, create separate sandboxes — one per concurrent agent task. The daemon lease is a single-trajectory ownership contract, not a multi-tenant safety system.
+
+  ```python
+  # Wrong: two concurrent borrows on one desktop
+  async with handle.borrow_async() as c1:
+      async with handle.borrow_async() as c2:  # blocks until c1 releases
+          ...
+
+  # Right: separate sandboxes for concurrent trajectories
+  computers = await asyncio.gather(
+      AsyncComputerSandbox.create(config),
+      AsyncComputerSandbox.create(config),
+  )
+  ```
+
+  For Modal Functions, set `max_containers` and use application admission control to prevent multiple concurrent invocations from trying to borrow the same desktop handle.
+</Accordion>
+
+<Accordion title="Stale sandboxes accumulating">
+  Old sandboxes that were not properly terminated continue to accrue cost and can interfere with pool management.
+
+  **Fix:** Use `ComputerSandboxManager.list()` to inspect live sandboxes with their ownership metadata, then `cleanup_expired()` with `dry_run=True` first to see candidates:
+
+  ```python
+  manager = ComputerSandboxManager()
+
+  # Preview what would be cleaned up
+  candidates = await manager.cleanup_expired_async(dry_run=True)
+  print(candidates)
+
+  # Actually terminate expired sandboxes
+  result = await manager.cleanup_expired_async(dry_run=False)
+  ```
+
+  Sandboxes with missing or invalid `computer-use.created_at` tags are skipped rather than terminated automatically. Only SDK-tagged sandboxes within the requested app scope are considered.
+</Accordion>
