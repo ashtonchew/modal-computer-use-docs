@@ -24,7 +24,7 @@
         "icon": "book",
         "groups": [
           {
-            "group": "Start",
+            "group": "Getting started",
             "pages": [
               "index",
               "start/installation",
@@ -32,7 +32,7 @@
             ]
           },
           {
-            "group": "Build",
+            "group": "Desktop workflows",
             "pages": [
               "build/create-and-attach",
               "build/browser-automation",
@@ -43,14 +43,14 @@
             ]
           },
           {
-            "group": "Integrate",
+            "group": "Model integrations",
             "pages": [
               "integrate/openai",
               "integrate/anthropic"
             ]
           },
           {
-            "group": "Operate",
+            "group": "Deployment and operations",
             "pages": [
               "operate/deploy",
               "operate/configure",
@@ -67,12 +67,17 @@
         "icon": "stopwatch",
         "groups": [
           {
-            "group": "Benchmarks",
+            "group": "Results and evidence",
             "pages": [
               "benchmarks/overview",
-              "benchmarks/run",
               "benchmarks/current-results",
-              "benchmarks/latency-evidence",
+              "benchmarks/latency-evidence"
+            ]
+          },
+          {
+            "group": "Run and reproduce",
+            "pages": [
+              "benchmarks/run",
               "benchmarks/reproducibility"
             ]
           }
