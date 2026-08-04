@@ -1,0 +1,74 @@
+---
+sidebarTitle: "OpenAPI"
+title: "OpenAPI reference"
+description: "Use and verify the checked-in OpenAPI 3.1 schema for the v1.1.0 daemon."
+
+---
+
+The daemon publishes an OpenAPI 3.1 contract. The checked-in schema reports API version `1.1.0`.
+
+## Verify the schema
+
+Run the freshness check from the repository root:
+
+```bash
+uv run python scripts/export_openapi.py --check
+```
+
+The command fails when the checked-in schema differs from the daemon application.
+
+The canonical file is [`docs/openapi.json`](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/openapi.json).
+
+## Route groups
+
+| Group | Routes |
+| --- | --- |
+| Health and metadata | `/healthz`, `/readyz`, `/v1/version`, `/v1/capabilities` |
+| Actions | `/v1/actions/run`, `/v1/actions/validate`, raw screenshot action routes |
+| Mouse | `/v1/mouse/*` |
+| Keyboard and input | `/v1/keyboard/*`, `/v1/input/release-all` |
+| Clipboard | `/v1/clipboard/text` |
+| Screenshots | `/v1/screenshots/full`, `/v1/screenshots/region`, `/v1/screenshots/zoom`, and raw variants |
+| Windows and display | `/v1/windows*`, `/v1/display/info` |
+| Browser and apps | `/v1/browser/*`, `/v1/apps/*` |
+| Commands | `/v1/commands/run` |
+| Artifacts | `/v1/artifacts*` |
+| Recordings | `/v1/recordings*` |
+| Lifecycle | `/v1/computer/*` |
+| Processes | `/v1/processes/{name}/*` |
+| Session | `/v1/session/metadata`, `/v1/session/refresh`, `/v1/session/tunnel-authorize` |
+| Debug | `/v1/debug/urls` |
+
+The schema also includes an experimental observation transport probe and a raw changed-frame action route. Treat the experimental observation contract as Alpha.
+
+## Authentication
+
+Health and readiness probes are unauthenticated. Protected control routes use the daemon authentication policy selected at startup.
+
+The Python SDK can use a local bearer token, Modal Connect identity, or the SDK-managed tunnel flow. The OpenAPI document does not declare a global security scheme. Do not infer that a control route is unauthenticated from the absence of a schema-level security entry.
+
+Keep credentials in headers. Do not put them in URL queries.
+
+## Request and response behavior
+
+The daemon accepts JSON for most control routes. Artifact PUT requests stream bytes and do not use the JSON body ceiling. Raw screenshot routes return image bytes.
+
+Direct errors use `{code, message, details}`. Validation failures can also use the generated FastAPI validation schema.
+
+Action batches have two timeout levels:
+
+- A per-action timeout
+- A whole-batch duration limit
+
+The whole-batch limit stops execution even when `continue_on_error` is true. `Idempotency-Key` can replay a completed batch response without re-executing the actions. Reusing the key with a different body returns HTTP 409.
+
+## Version check
+
+Read `/v1/version` before a client depends on a version-specific contract. Read `/v1/capabilities` before it depends on an optional backend or runtime capability.
+
+```python
+version = client.get_json("/v1/version")
+capabilities = client.get_json("/v1/capabilities")
+```
+
+Use the typed [namespace reference](/reference/namespaces) for Python applications. Use the OpenAPI document for non-Python clients and generated tooling.
