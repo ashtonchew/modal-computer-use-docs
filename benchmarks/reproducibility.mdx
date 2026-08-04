@@ -1,73 +1,39 @@
 ---
 sidebarTitle: "Reproducibility"
-title: "Benchmark reproducibility"
-description: "Prepare, run, sanitize, and verify modal-computer-use benchmark evidence."
+title: "Reproduce a benchmark"
+description: "Follow the canonical procedure and verify tracked Modal Computer Use benchmark evidence."
 
 ---
 
-Use this checklist when you create evidence that may appear in a report.
+The application repository owns the benchmark procedure and evidence policy. This page gives you the shortest path to those sources.
 
-## Define the claim
+## 1. Open the canonical procedure
 
-State one measurement question. Select the command that owns that question. Record the timer start and end before the run.
+Read the [benchmark procedure](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmarking.md) before you run a benchmark.
 
-Do not combine unlike boundaries. A ready daemon, a returned action response, a changed frame, and an application-ready state are different events.
+It defines the timer boundaries, source-state rules, sample handling, sanitization, cost controls, cleanup checks, and publication gate.
 
-## Freeze the source
+## 2. Select the evidence class
 
-Record the exact source and harness revisions. Use a clean tracked worktree for publishable evidence.
+Use the [benchmark data policy](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/README.md) to select an artifact type and storage location.
 
-```bash
-git rev-parse HEAD
-git status --porcelain
-```
+Keep raw output in the ignored `benchmark-results/` directory. Promote only the sanitized artifact that the procedure permits.
 
-If an approved diagnostic uses a dirty worktree, label it as a candidate. Bind its diff digest. Do not describe it as revision-only evidence.
+## 3. Run the benchmark
 
-## Record the protocol
+Use the command for your measurement question. The [run benchmarks](./run) page lists the current commands.
 
-Record these facts with the run:
+Record the exact source and harness revisions. Do not cite a branch name as evidence.
 
-- Command and workload
-- Timer boundary and unit
-- Warmup and measured sample counts
-- Requested and observed configuration
-- Caller topology
-- Failures and cleanup state
-- Artifact digest
+## 4. Verify the result
 
-Do not replace failed samples unless the preregistered protocol permits replacement. Report attempted and successful counts.
-
-## Keep samples when safe
-
-Retain exact numeric observations when the secret policy permits it. Do not reconstruct missing samples from summaries.
-
-The July 30 subprocess artifact and the August 2 replication artifacts retain sanitized sample arrays. The historical July 23 native X11 artifact does not. A fresh clone can quote its aggregate values, but it cannot recompute those values from the original samples.
-
-## Sanitize before tracking
-
-Keep raw output under ignored `benchmark-results/`. Inspect the promoted artifact for:
-
-- Credentials and bearer tokens
-- Endpoint and noVNC URLs
-- Resource identifiers
-- Typed or clipboard text
-- Screenshots and artifact bytes
-- Command output and raw failure text
-
-Use the artifact-specific sanitizer or validator. Run its check mode when available. The [benchmark data policy](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/README.md) owns eligibility and storage rules.
-
-## Verify summaries and links
-
-Recompute every reported statistic from tracked samples when they exist. Verify any bound dependency with its recorded SHA-256 digest.
-
-Run the focused benchmark evidence tests:
+Run the focused evidence tests.
 
 ```bash
 uv run pytest tests/benchmarks
 ```
 
-Run the complete repository checks before you publish a report:
+Run the full repository gate before you publish a report.
 
 ```bash
 uv run ruff check .
@@ -76,26 +42,12 @@ uv run pytest
 uv run python scripts/export_openapi.py --check
 ```
 
-The [current report](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmark-results-2026-07-30-warm-paths.md) binds its exact input artifacts and harness revisions. Follow that pattern for a dated report.
+The [July 30 report](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmark-results-2026-07-30-warm-paths.md) shows how a report binds its source revisions and input artifacts.
 
-## Account for cost and cleanup
+## 5. Cite tracked evidence
 
-Record pricing sources, access date, billing units, and applicable rates before a live run. Calculate a maximum cost from lifecycle timeouts and the maximum resource count.
+Link each claim to the exact application commit that contains its report or artifact. State any limit that prevents independent recalculation.
 
-Treat cleanup failure as benchmark failure. Inspect the provider console after the run. Keep billing reconciliation separate from a public-rate estimate.
-
-The [canonical benchmark procedure](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmarking.md) defines the complete cost and cleanup requirements.
-
-## Publication gate
-
-Publish a result only when you can answer yes to each question:
-
-1. Does the artifact state one clear scope?
-2. Does the source state match the artifact claim?
-3. Are sample counts and failures explicit?
-4. Can tracked data reproduce the reported summaries when samples are available?
-5. Did the validator remove secret-bearing fields?
-6. Did required placement and cleanup checks pass?
-7. Does the report state every material limitation?
-
-If any answer is no, keep the artifact in `benchmark-results/` and do not present it as current evidence.
+<Note>
+The documentation site explains how to find and read the evidence. The application repository remains the only source for benchmark rules, reports, and artifacts.
+</Note>
