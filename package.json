@@ -1,0 +1,50 @@
+{
+  "name": "modal-computer-use-docs",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Public documentation for Modal Computer Use",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "mint dev",
+    "validate": "mint validate",
+    "check:links": "mint broken-links --check-anchors --check-redirects --check-snippets",
+    "check:a11y": "mint a11y",
+    "check:source": "node scripts/check-docs.mjs",
+    "check:dependencies": "node scripts/check-dependencies.mjs",
+    "check": "npm run check:source && npm run validate && npm run check:links && npm run check:a11y && npm run check:dependencies"
+  },
+  "devDependencies": {
+    "mint": "4.2.773"
+  },
+  "overrides": {
+    "adm-zip": "0.6.0",
+    "axios": "1.18.0",
+    "@mintlify/cli": {
+      "js-yaml": "4.3.0"
+    },
+    "@mintlify/common": {
+      "js-yaml": "4.3.0"
+    },
+    "@mintlify/prebuild": {
+      "js-yaml": "4.3.0"
+    },
+    "@mintlify/previewing": {
+      "js-yaml": "4.3.0"
+    },
+    "@mintlify/scraping": {
+      "js-yaml": "4.3.0"
+    },
+    "@mintlify/validation": {
+      "js-yaml": "4.3.0"
+    },
+    "front-matter": {
+      "js-yaml": "3.14.2"
+    },
+    "postcss": "8.5.23",
+    "qs": "6.15.2",
+    "sharp": "0.35.0",
+    "tar": "7.5.21"
+  }
+}
