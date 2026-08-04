@@ -1,100 +1,95 @@
 ---
-title: "modal-computer-use: Linux desktop control for AI agents"
+title: "Control a Linux desktop on Modal"
 sidebarTitle: "Home"
-description: "Turn a Modal Sandbox into a remotely controllable Linux desktop. Control mouse, keyboard, browser, and files from Python — sync or async."
+description: "Create and control a Linux desktop in a Modal Sandbox with Modal Computer Use."
 ---
 
-`modal-computer-use` gives your AI agents a real Linux desktop running inside Modal. You get a typed Python SDK with namespaces for every desktop operation — mouse, keyboard, clipboard, browser, screenshots, recordings, and file artifacts — all backed by a daemon that keeps state across turns.
+Modal Computer Use provides a typed Python SDK and an in-Sandbox daemon. You can control the mouse, keyboard, browser, files, screenshots, and recordings.
+
+This is an independent project that uses Modal.
+
+## Run the quickstart
+
+You need Python 3.12 or later. You also need a Modal account with local credentials.
+
+Install the package with the Modal extra:
+
+```bash
+uv add "modal-computer-use[modal]"
+```
+
+Save this file as `quickstart.py`:
+
+```python
+from modal_computer_use import (
+    BrowserConfig,
+    ComputerConfig,
+    ComputerSandbox,
+    ResourceConfig,
+)
+
+config = ComputerConfig(
+    resources=ResourceConfig(profile="browser"),
+    browser=BrowserConfig(kind="chromium"),
+)
+
+with ComputerSandbox.create(config=config) as computer:
+    computer.browser.open_url("https://example.com")
+    computer.mouse.move(320, 240)
+    screenshot = computer.screenshots.full()
+    screenshot.save("screenshot.png")
+    print(screenshot.width, screenshot.height, screenshot.sha256)
+```
+
+Run the file:
+
+```bash
+uv run python quickstart.py
+```
+
+The SDK terminates the Sandbox when the `with` block ends. It also closes the daemon connection.
 
 <CardGroup cols={2}>
-  <Card title="Quickstart" icon="rocket" href="/quickstart">
-    Launch a desktop, take a screenshot, and save it locally in under five minutes.
+  <Card title="Install" href="/start/installation">
+    Install the package and set up Modal credentials.
   </Card>
-  <Card title="Installation" icon="box" href="/installation">
-    Install the SDK and Modal extra with uv or pip.
+  <Card title="Create or attach" href="/build/create-and-attach">
+    Choose the lifecycle that matches your application.
   </Card>
-  <Card title="Core Concepts" icon="book" href="/concepts/sandbox-lifecycle">
-    Understand sandbox lifecycle, namespaces, and ownership rules.
+  <Card title="Automate a browser" href="/build/browser-automation">
+    Configure Chromium or Firefox and open a page.
   </Card>
-  <Card title="API Reference" icon="code" href="/reference/computer-sandbox">
-    Full reference for ComputerSandbox, config models, and every namespace.
+  <Card title="Run action batches" href="/build/action-batches">
+    Send ordered desktop actions in one request.
   </Card>
-</CardGroup>
-
-## What you can do
-
-<CardGroup cols={3}>
-  <Card title="Control the Desktop" icon="computer-mouse" href="/concepts/namespaces">
-    Move and click the mouse, type text, press hotkeys, manage windows, and read or write the clipboard.
+  <Card title="Capture output" href="/build/screenshots-recordings">
+    Save screenshots and record the desktop.
   </Card>
-  <Card title="Automate the Browser" icon="browser" href="/guides/browser-automation">
-    Launch Chromium or Firefox, open URLs, prewarm a profile, and capture render metrics.
-  </Card>
-  <Card title="Capture Observations" icon="camera" href="/guides/screenshots-recordings">
-    Take full-screen or region screenshots, stream frames over a WebSocket, and record video.
-  </Card>
-  <Card title="Run Commands" icon="terminal" href="/guides/action-batches">
-    Execute shell commands, batch desktop actions, and read process logs directly from the desktop.
-  </Card>
-  <Card title="Manage Files" icon="folder" href="/guides/artifacts-storage">
-    Upload, download, and persist artifacts. Sync to a Modal Volume for durable storage.
-  </Card>
-  <Card title="Connect AI Providers" icon="robot" href="/adapters/overview">
-    Use the built-in OpenAI and Anthropic adapters to translate model actions directly to desktop operations.
+  <Card title="Persist artifacts" href="/build/artifacts-storage">
+    Store files in a Sandbox or a Modal Volume.
   </Card>
 </CardGroup>
 
-## Get started in three steps
+## How the parts connect
 
-<Steps>
-  <Step title="Install the SDK">
-    Add `modal-computer-use` with the Modal extra using `uv` or `pip`:
+```mermaid
+flowchart LR
+    A["Your Python application"] --> B["Modal Computer Use SDK"]
+    B --> C["Modal Sandbox"]
+    C --> D["Computer-use daemon"]
+    D --> E["Linux desktop"]
+```
 
-    ```bash
-    uv add "modal-computer-use[modal]"
-    ```
-  </Step>
-  <Step title="Create a desktop">
-    Use `ComputerSandbox.create()` to spin up a Modal Sandbox with a full Linux desktop:
+Your application owns the task and any model loop. The SDK owns Modal orchestration. The daemon executes desktop primitives inside the Sandbox.
 
-    ```python quickstart.py
-    from modal_computer_use import (
-        BrowserConfig,
-        ComputerConfig,
-        ComputerSandbox,
-        ResourceConfig,
-    )
+## Choose an API surface
 
-    config = ComputerConfig(
-        resources=ResourceConfig(profile="browser"),
-        browser=BrowserConfig(kind="chromium"),
-    )
+| Need | API |
+| --- | --- |
+| Create a desktop from synchronous Python | `ComputerSandbox.create()` |
+| Create a desktop from async Python | `AsyncComputerSandbox.create()` |
+| Attach to an existing Modal Sandbox | `ComputerSandbox.attach()` |
+| Connect to an existing daemon | `DaemonClient` or `AsyncDaemonClient` |
+| Borrow a desktop in a deployed Modal Function | `ComputerSessionHandle.borrow_async()` |
 
-    with ComputerSandbox.create(config=config) as computer:
-        computer.browser.open_url("https://example.com")
-        computer.mouse.move(320, 240)
-        screenshot = computer.screenshots.full()
-        screenshot.save("screenshot.png")
-        print(screenshot.width, screenshot.height, screenshot.sha256)
-    ```
-  </Step>
-  <Step title="Run your script">
-    ```bash
-    uv run python quickstart.py
-    ```
-
-    When the `with` block ends, the SDK terminates the Sandbox automatically.
-  </Step>
-</Steps>
-
-## Choose your interface
-
-`modal-computer-use` provides three main entry points depending on your use case:
-
-| Interface | Best for |
-|---|---|
-| `ComputerSandbox` | Synchronous scripts and notebooks |
-| `AsyncComputerSandbox` | Async applications and Modal Functions |
-| `AsyncDaemonClient` | Connecting to an already-running daemon |
-
-See [Sync vs. Async](/concepts/async-sync) for guidance on choosing the right interface.
+Use the [Python API guide](https://github.com/ashtonchew/modal-computer-use/blob/main/docs/api.md) for the complete contract. Use the [OpenAPI schema](https://github.com/ashtonchew/modal-computer-use/blob/main/docs/openapi.json) for HTTP request and response models.

@@ -1,0 +1,82 @@
+---
+title: "Capture screenshots and recordings"
+sidebarTitle: "Screenshots and recordings"
+description: "Capture desktop images and record an MP4 file."
+---
+
+## Capture a full screenshot
+
+```python
+screenshot = computer.screenshots.full(
+    format="png",
+    show_cursor=True,
+)
+screenshot.save("desktop.png")
+print(screenshot.width, screenshot.height, screenshot.sha256)
+```
+
+The default storage mode is `inline`. The returned `Screenshot` can contain raw bytes, base64 data, or an artifact URI. Use `screenshot.as_bytes()` when the payload is inline.
+
+## Capture a region
+
+```python
+region = computer.screenshots.region(
+    x=100,
+    y=80,
+    width=640,
+    height=480,
+    format="png",
+)
+region.save("region.png")
+```
+
+Use `full_bytes()` or `region_bytes()` when you only need encoded image bytes:
+
+```python
+from pathlib import Path
+
+data = computer.screenshots.full_bytes(format="png")
+Path("desktop.png").write_bytes(data)
+```
+
+## Store a screenshot as an artifact
+
+```python
+screenshot = computer.screenshots.full(
+    format="png",
+    storage="artifact",
+)
+print(screenshot.artifact_uri)
+```
+
+Artifact storage changes daemon state. Keep artifact URIs out of logs because they can reveal run details.
+
+## Record the desktop
+
+```python
+from pathlib import Path
+
+recording = computer.recordings.start(name="demo", fps=12)
+try:
+    computer.mouse.move(50, 50)
+finally:
+    stopped = computer.recordings.stop(recording.id)
+
+path = computer.recordings.download(
+    stopped.id,
+    Path("artifacts/demo-recording.mp4"),
+)
+print(stopped.status, stopped.size_bytes, path.exists())
+```
+
+Always stop a recording before you terminate its Sandbox. This lets `ffmpeg` finish the file.
+
+## Inspect and remove recordings
+
+```python
+recordings = computer.recordings.list()
+selected = computer.recordings.get(recording.id)
+computer.recordings.delete(selected.id)
+```
+
+Recording methods use the recording `id`. A recording `name` is optional metadata and is not a route identifier.
