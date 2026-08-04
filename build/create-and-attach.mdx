@@ -65,10 +65,7 @@ with ComputerSandbox.attach_or_create(
     name="support-desktop",
     config=ComputerConfig(),
 ) as computer:
-    metadata = computer.metadata()
-    if metadata is None:
-        raise RuntimeError("Modal metadata is unavailable")
-    print(metadata.sandbox_id)
+    print(computer.status().ready)
 ```
 
 The SDK attaches to a compatible live Sandbox with that app-scoped name. It creates one if none exists. The context terminates only a Sandbox that this call created.

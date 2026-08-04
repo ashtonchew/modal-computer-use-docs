@@ -75,7 +75,7 @@ Set the same measured region selector on the desktop and the Function. Pass that
 
 Use `retries=0` for the stateful Function. A platform retry still does not make a GUI trajectory exactly once.
 
-The [session handoff example](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/modal_function_session_handoff.py) shows the owner and borrower roles.
+The [session handoff example](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/modal_function_session_handoff.py) shows how an owner lends one desktop to a deployed Function. Use it when the Function needs a complete stateful trajectory. The owner remains responsible for lifetime and ambiguous outcomes.
 
 <Warning>
 The owner must keep the target running until each remote or spawned Function call reaches a terminal outcome. Function cancellation does not undo prior input. It also does not terminate the desktop.

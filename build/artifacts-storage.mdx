@@ -15,7 +15,7 @@ info = computer.artifacts.write_bytes(
     "text/plain",
 )
 data = computer.artifacts.read_bytes("runs/example/result.txt")
-print(info.size_bytes, data.decode())
+print(info.size_bytes, len(data))
 ```
 
 Use a separate prefix for each run. This prevents unrelated runs from writing the same file.

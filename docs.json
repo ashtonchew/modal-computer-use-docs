@@ -2,9 +2,14 @@
   "$schema": "https://mintlify.com/docs.json",
   "name": "Modal Computer Use",
   "description": "Deploy and control a Linux desktop in a Modal Sandbox.",
+  "logo": {
+    "light": "/logo/modal_cua_logo.png",
+    "dark": "/logo/modal_cua_logo.png"
+  },
+  "favicon": "/favicon.png",
   "theme": "mint",
   "colors": {
-    "primary": "#2FA818",
+    "primary": "#248713",
     "light": "#7FEE63",
     "dark": "#248713"
   },
@@ -16,18 +21,19 @@
     "tabs": [
       {
         "tab": "Documentation",
-        "icon": "book-open",
+        "icon": "book",
         "groups": [
           {
-            "group": "Start",
+            "group": "Getting started",
             "pages": [
               "index",
               "start/installation",
-              "start/quickstart"
+              "start/quickstart",
+              "start/examples"
             ]
           },
           {
-            "group": "Build",
+            "group": "Desktop workflows",
             "pages": [
               "build/create-and-attach",
               "build/browser-automation",
@@ -38,14 +44,14 @@
             ]
           },
           {
-            "group": "Integrate",
+            "group": "Model integrations",
             "pages": [
               "integrate/openai",
               "integrate/anthropic"
             ]
           },
           {
-            "group": "Operate",
+            "group": "Deployment and operations",
             "pages": [
               "operate/deploy",
               "operate/configure",
@@ -62,12 +68,17 @@
         "icon": "stopwatch",
         "groups": [
           {
-            "group": "Benchmarks",
+            "group": "Results and evidence",
             "pages": [
               "benchmarks/overview",
-              "benchmarks/run",
               "benchmarks/current-results",
-              "benchmarks/latency-evidence",
+              "benchmarks/latency-evidence"
+            ]
+          },
+          {
+            "group": "Run and reproduce",
+            "pages": [
+              "benchmarks/run",
               "benchmarks/reproducibility"
             ]
           }
@@ -95,6 +106,9 @@
         ]
       }
     ]
+  },
+  "contextual": {
+    "options": ["copy", "view", "chatgpt", "claude"]
   },
   "navbar": {
     "primary": {

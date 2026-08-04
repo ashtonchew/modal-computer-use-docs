@@ -46,7 +46,7 @@ screenshot = computer.screenshots.full(
     format="png",
     storage="artifact",
 )
-print(screenshot.artifact_uri)
+print(screenshot.width, screenshot.height, screenshot.size_bytes)
 ```
 
 Artifact storage changes daemon state. Keep artifact URIs out of logs because they can reveal run details.

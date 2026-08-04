@@ -87,5 +87,4 @@ Run `reconcile_warm_pool()` from your operator process. It removes invalid, inco
 
 Queue entries can outlive a terminated slot. Claim validation rejects stale entries.
 
-Use the [warm-pool example](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/04_warm_pool.py) as the maintained executable pattern.
-
+Use the [warm-pool example](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/04_warm_pool.py) when startup latency justifies reserved capacity. Filled slots can remain billable while idle. Each claim is one-shot.
