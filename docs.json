@@ -2,9 +2,14 @@
   "$schema": "https://mintlify.com/docs.json",
   "name": "Modal Computer Use",
   "description": "Deploy and control a Linux desktop in a Modal Sandbox.",
+  "logo": {
+    "light": "/logo/modal_cua_logo.png",
+    "dark": "/logo/modal_cua_logo.png"
+  },
+  "favicon": "/favicon.png",
   "theme": "mint",
   "colors": {
-    "primary": "#2FA818",
+    "primary": "#248713",
     "light": "#7FEE63",
     "dark": "#248713"
   },
