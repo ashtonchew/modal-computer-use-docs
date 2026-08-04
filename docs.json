@@ -21,7 +21,7 @@
     "tabs": [
       {
         "tab": "Documentation",
-        "icon": "book-open",
+        "icon": "book",
         "groups": [
           {
             "group": "Start",
@@ -100,6 +100,9 @@
         ]
       }
     ]
+  },
+  "contextual": {
+    "options": ["copy", "view", "chatgpt", "claude"]
   },
   "navbar": {
     "primary": {
