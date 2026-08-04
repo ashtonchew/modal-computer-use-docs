@@ -63,8 +63,8 @@ function hasSafeFrontmatter(lines) {
     counts.get("title") === 1 &&
     counts.get("sidebarTitle") === 1 &&
     counts.get("description") === 1 &&
-    (counts.get("hideFooterPagination") ?? 0) <= 1 &&
-    lines.length === 3 + (counts.has("hideFooterPagination") ? 1 : 0)
+    counts.get("hideFooterPagination") === 1 &&
+    lines.length === 4
   );
 }
 
@@ -83,7 +83,7 @@ export async function validateDocs(rootPath = repositoryRoot) {
     const frontmatterLines = frontmatter.split("\n").filter(Boolean);
     if (!hasSafeFrontmatter(frontmatterLines)) {
       errors.push(
-        `${relativePath}: use only quoted title, sidebarTitle, and description metadata plus optional hideFooterPagination: true`,
+        `${relativePath}: use quoted title, sidebarTitle, and description metadata plus hideFooterPagination: true`,
       );
     }
     if (!/^title:\s*.+$/m.test(frontmatter)) {
