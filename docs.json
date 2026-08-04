@@ -2,11 +2,11 @@
   "$schema": "https://mintlify.com/docs.json",
   "name": "Modal Computer Use",
   "description": "Deploy and control a Linux desktop in a Modal Sandbox.",
-  "theme": "luma",
+  "theme": "mint",
   "colors": {
-    "primary": "#5B5BD6",
-    "light": "#A5B4FC",
-    "dark": "#5B5BD6"
+    "primary": "#2FA818",
+    "light": "#7FEE63",
+    "dark": "#248713"
   },
   "styling": {
     "eyebrows": "breadcrumbs",
@@ -104,7 +104,8 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/ashtonchew/modal-computer-use"
+      "github": "https://github.com/ashtonchew/modal-computer-use",
+      "x": "https://x.com/ashtonchew"
     },
     "links": [
       {
@@ -171,5 +172,16 @@
     { "source": "/reference/namespaces/filesystem", "destination": "/reference/namespaces" },
     { "source": "/reference/error-types", "destination": "/reference/errors-and-models" },
     { "source": "/reference/data-models", "destination": "/reference/errors-and-models" }
-  ]
+  ],
+  "background": {
+    "color": {
+      "dark": "#141614"
+    }
+  },
+  "icons": {
+    "library": "tabler"
+  },
+  "fonts": {
+    "family": "Geist"
+  }
 }
