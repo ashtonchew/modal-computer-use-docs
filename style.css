@@ -1,0 +1,13 @@
+/* Keep page navigation visually separate from the global footer. */
+#pagination {
+  min-height: 3.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgb(var(--gray-200));
+  border-radius: 0.75rem;
+  background: rgb(var(--gray-50) / 0.5);
+}
+
+.dark #pagination {
+  border-color: rgb(var(--gray-800));
+  background: rgb(var(--gray-900) / 0.5);
+}
