@@ -50,11 +50,10 @@ function evidenceReferences(source) {
 
 function hasSafeFrontmatter(lines) {
   const quotedMetadataLine = /^(title|sidebarTitle|description): "[^"\n]*"$/;
-  const booleanMetadataLine = /^(hideFooterPagination): true$/;
   const counts = new Map();
 
   for (const line of lines) {
-    const match = quotedMetadataLine.exec(line) ?? booleanMetadataLine.exec(line);
+    const match = quotedMetadataLine.exec(line);
     if (match === null) return false;
     counts.set(match[1], (counts.get(match[1]) ?? 0) + 1);
   }
@@ -63,8 +62,7 @@ function hasSafeFrontmatter(lines) {
     counts.get("title") === 1 &&
     counts.get("sidebarTitle") === 1 &&
     counts.get("description") === 1 &&
-    counts.get("hideFooterPagination") === 1 &&
-    lines.length === 4
+    lines.length === 3
   );
 }
 
@@ -81,9 +79,14 @@ export async function validateDocs(rootPath = repositoryRoot) {
     const source = await readFile(file, "utf8");
     const frontmatter = source.match(/^---\n([\s\S]*?)\n---\n/)?.[1] ?? "";
     const frontmatterLines = frontmatter.split("\n").filter(Boolean);
+    if (/^hideFooterPagination:/m.test(frontmatter)) {
+      errors.push(
+        `${relativePath}: remove hideFooterPagination to show previous and next page links`,
+      );
+    }
     if (!hasSafeFrontmatter(frontmatterLines)) {
       errors.push(
-        `${relativePath}: use quoted title, sidebarTitle, and description metadata plus hideFooterPagination: true`,
+        `${relativePath}: use quoted title, sidebarTitle, and description metadata`,
       );
     }
     if (!/^title:\s*.+$/m.test(frontmatter)) {

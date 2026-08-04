@@ -3,8 +3,8 @@
   "name": "Modal Computer Use",
   "description": "Deploy and control a Linux desktop in a Modal Sandbox.",
   "logo": {
-    "light": "/logo/modal_cua_logo.png",
-    "dark": "/logo/modal_cua_logo.png"
+    "light": "/logo/modal-computer-use-wordmark-light.png",
+    "dark": "/logo/modal-computer-use-wordmark-dark.png"
   },
   "favicon": "/favicon.png",
   "theme": "mint",

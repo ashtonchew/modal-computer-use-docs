@@ -10,7 +10,6 @@ const frontmatter = `---
 title: "Test"
 sidebarTitle: "Test"
 description: "Test page."
-hideFooterPagination: true
 ---
 `;
 
@@ -31,27 +30,30 @@ test("accepts a valid documentation tree", async (context) => {
   assert.deepEqual((await validateDocs(root)).errors, []);
 });
 
-test("accepts the required footer pagination policy", async (context) => {
-  const root = await fixture();
-  context.after(() => rm(root, { recursive: true, force: true }));
-  assert.deepEqual((await validateDocs(root)).errors, []);
-});
-
-test("rejects a navigated page without the footer pagination policy", async (context) => {
-  const metadata = frontmatter.replace("hideFooterPagination: true\n", "");
-  const root = await fixture(`${metadata}\nValid page.\n`);
-  context.after(() => rm(root, { recursive: true, force: true }));
-  assert.match((await validateDocs(root)).errors.join("\n"), /hideFooterPagination: true/);
-});
-
-test("rejects unsupported footer pagination values", async (context) => {
+test("rejects a navigated page that hides footer pagination", async (context) => {
   const metadata = frontmatter.replace(
-    "hideFooterPagination: true",
-    "hideFooterPagination: false",
+    "description: \"Test page.\"",
+    "description: \"Test page.\"\nhideFooterPagination: true",
   );
   const root = await fixture(`${metadata}\nValid page.\n`);
   context.after(() => rm(root, { recursive: true, force: true }));
-  assert.match((await validateDocs(root)).errors.join("\n"), /hideFooterPagination: true/);
+  assert.match(
+    (await validateDocs(root)).errors.join("\n"),
+    /remove hideFooterPagination to show previous and next page links/,
+  );
+});
+
+test("rejects an unsupported false footer pagination value", async (context) => {
+  const metadata = frontmatter.replace(
+    "description: \"Test page.\"",
+    "description: \"Test page.\"\nhideFooterPagination: false",
+  );
+  const root = await fixture(`${metadata}\nValid page.\n`);
+  context.after(() => rm(root, { recursive: true, force: true }));
+  assert.match(
+    (await validateDocs(root)).errors.join("\n"),
+    /remove hideFooterPagination to show previous and next page links/,
+  );
 });
 
 test("rejects metadata that can reach unsafe YAML features", async (context) => {
@@ -60,7 +62,6 @@ title: "Test"
 sidebarTitle: "Test"
 description: "Test page."
 alias: &value unsafe
-hideFooterPagination: true
 ---
 `);
   context.after(() => rm(root, { recursive: true, force: true }));
