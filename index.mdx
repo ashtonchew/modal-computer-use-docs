@@ -81,6 +81,8 @@ flowchart LR
     B --> C["Modal Sandbox"]
     C --> D["Computer-use daemon"]
     D --> E["Linux desktop"]
+    classDef product fill:#248713,stroke:#7FEE63,color:#FFFFFF,stroke-width:2px,font-weight:600;
+    class B product;
 ```
 
 Your application owns the task and any model loop. The SDK owns Modal orchestration. The daemon executes desktop primitives inside the Sandbox.
