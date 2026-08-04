@@ -1,0 +1,121 @@
+---
+title: "Run an OpenAI computer loop"
+sidebarTitle: "OpenAI"
+description: "Connect the OpenAI Responses API computer tool to a Modal desktop."
+---
+
+`OpenAIAdapter` converts OpenAI computer actions to native desktop actions. It does not call the OpenAI API. Your application owns the model client, conversation state, policy, and limits.
+
+## Install the provider extra
+
+```bash
+uv add "modal-computer-use[modal,openai]"
+```
+
+Set `OPENAI_API_KEY` in the application environment. Do not add the key to the Sandbox image.
+
+## Create the desktop
+
+```python
+from modal_computer_use import (
+    BrowserConfig,
+    ComputerConfig,
+    ComputerSandbox,
+    ResourceConfig,
+)
+
+config = ComputerConfig(
+    resources=ResourceConfig(profile="browser"),
+    browser=BrowserConfig(kind="chromium"),
+)
+```
+
+Use the created desktop for the full loop:
+
+```python
+with ComputerSandbox.create(config=config) as computer:
+    run_loop(client=client, computer=computer, task=task)
+```
+
+The context terminates the Sandbox when the loop ends.
+
+## Use the Responses API computer tool
+
+Use the GA `computer` tool for new code:
+
+```python
+response = client.responses.create(
+    model="gpt-5.6",
+    tools=[{"type": "computer"}],
+    input=task,
+)
+```
+
+Collect every output item with type `computer_call`. Stop when the response has no computer calls.
+
+## Preflight before you act
+
+Normalize and validate every computer call in the response before you change the desktop. Count actions after adapter expansion. This count includes multi-key keypresses and two-axis scrolls.
+
+Set limits for these values:
+
+| Limit | Purpose |
+| --- | --- |
+| Turns | Stops an endless provider loop. |
+| Trajectory actions | Bounds all desktop actions for one task. |
+| Expanded batch actions | Bounds one provider call after normalization. |
+| Action time | Bounds one native action. |
+| Batch time | Bounds one ordered batch. |
+| Elapsed time | Bounds the complete loop. |
+
+If the last allowed turn requests another action, stop before you execute it.
+
+## Execute one batch for each call
+
+Create the adapter once. Keep it for the full loop.
+
+```python
+from modal_computer_use.adapters.openai import (
+    OpenAIAdapter,
+    openai_computer_call_output,
+)
+
+adapter = OpenAIAdapter(computer)
+
+batch = adapter.apply_many(
+    actions,
+    continue_on_error=False,
+    screenshot_after=True,
+)
+```
+
+The adapter supports `click`, `double_click`, `scroll`, `type`, `keypress`, `drag`, `move`, `wait`, and `screenshot`.
+
+Use the final native screenshot when the last action is `screenshot`. Otherwise, use `batch.screenshot`. Do not capture a second screenshot for the same call.
+
+Build one result for each computer call. Preserve the call ID and response order.
+
+```python
+output = openai_computer_call_output(
+    screenshot,
+    call_id=call.call_id,
+    detail="original",
+)
+```
+
+Pass the result list as the next `input`. Pass `response.id` as `previous_response_id`.
+
+## Apply coordinates and policy
+
+Pass `CoordinateSpace` to the adapter when the model image size differs from the desktop size. The adapter maps model coordinates to desktop coordinates before it executes an action.
+
+Use `before_action` to inspect each normalized action. A decision of `deny`, `ask_user`, or `handoff` stops the action before it reaches the daemon.
+
+<Warning>
+Treat the task, page content, screenshots, provider output, typed text, and clipboard text as untrusted data. Require confirmation before an action creates an external effect. Do not bypass a CAPTCHA. Hand password changes back to the user.
+</Warning>
+
+## Use the maintained example
+
+The [OpenAI loop example](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/03_openai_computer_loop.py) contains the complete preflight, timeout, batching, screenshot reuse, and cleanup logic.
+

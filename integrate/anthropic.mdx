@@ -1,0 +1,128 @@
+---
+title: "Run an Anthropic computer loop"
+sidebarTitle: "Anthropic"
+description: "Connect the Anthropic Messages API computer tool to a Modal desktop."
+---
+
+`AnthropicAdapter` converts Anthropic computer actions to native desktop actions. It does not call the Anthropic API. Your application owns the model client, message history, policy, and limits.
+
+## Install the provider extra
+
+```bash
+uv add "modal-computer-use[modal,anthropic]"
+```
+
+Set `ANTHROPIC_API_KEY` in the application environment. Do not add the key to the Sandbox image.
+
+## Select a tool version
+
+Use matching tool and beta versions.
+
+| Tool | Beta header | Use |
+| --- | --- | --- |
+| `computer_20251124` | `computer-use-2025-11-24` | New integrations and optional zoom. |
+| `computer_20250124` | `computer-use-2025-01-24` | Compatible older integrations. |
+| `computer_20241022` | `computer-use-2024-10-22` | Adapter compatibility only. |
+
+The adapter defaults to `computer_20251124`. Set `enable_zoom=True` to enable zoom for that version.
+
+## Declare the hosted tool
+
+Anthropic owns the hosted `computer` tool schema. Do not add an input schema to it.
+
+```python
+response = client.beta.messages.create(
+    model="claude-sonnet-5",
+    betas=["computer-use-2025-11-24"],
+    max_tokens=4096,
+    tools=[
+        {
+            "type": "computer_20251124",
+            "name": "computer",
+            "display_width_px": 1280,
+            "display_height_px": 800,
+            "enable_zoom": True,
+        }
+    ],
+    messages=messages,
+)
+```
+
+Keep the complete assistant content in message history. Continue only when `stop_reason` is `tool_use`. Return all matching tool results together in the next user message.
+
+## Execute actions in order
+
+Create the adapter once for the complete loop:
+
+```python
+from modal_computer_use.adapters.anthropic import (
+    AnthropicAdapter,
+    anthropic_tool_result,
+)
+
+adapter = AnthropicAdapter(
+    computer,
+    tool_version="computer_20251124",
+    enable_zoom=True,
+)
+```
+
+Execute hosted tool calls in response order. Do not combine separate hosted calls into one batch.
+
+```python
+from modal_computer_use import Screenshot
+
+action = tool_use.input
+result = adapter.apply(action)
+
+if action["action"] in {"screenshot", "zoom"}:
+    observation = Screenshot.model_validate(result.output)
+elif action["action"] == "cursor_position":
+    observation = result
+else:
+    observation = computer.screenshots.full()
+
+tool_result = anthropic_tool_result(
+    tool_use_id=tool_use.id,
+    result=observation,
+)
+```
+
+Reuse a screenshot returned by `screenshot` or `zoom`. Return cursor coordinates as text. Capture one screenshot after another successful hosted action.
+
+## Use a batch tool only for fixed sequences
+
+Your application can define a custom `computer_batch` tool. Use it only when every action can run without an intermediate model decision.
+
+All batch coordinates refer to the screenshot from before the batch. Execute actions sequentially. Stop on the first error.
+
+Use the hosted `computer` tool for these cases:
+
+- Exploratory navigation.
+- Sensitive steps.
+- Recovery after a failure.
+- A step that depends on an intermediate screen.
+
+The [Anthropic loop example](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/anthropic_message_server.py) contains the reviewed custom schema for all supported tool versions.
+
+## Supported actions
+
+All versions support mouse movement, clicks, drag, key input, typing, screenshots, and cursor position.
+
+The 2025 versions also support scroll, mouse down and up, held keys, wait, and triple click. The `computer_20251124` version supports zoom when you enable it.
+
+The adapter rejects an action that the selected version does not support.
+
+## Bound the loop
+
+Set limits for turns, trajectory actions, batch actions, action time, and elapsed time. Stop before you act when the final allowed turn requests another tool call.
+
+Pass `CoordinateSpace` when the provider image size differs from the desktop size. The adapter then maps provider coordinates before execution.
+
+<Warning>
+Treat the task, page content, screenshots, provider output, typed text, and clipboard text as untrusted data. Require confirmation before an action creates an external effect. Anthropic's hosted safety checks do not cover an application-owned batch tool.
+</Warning>
+
+## Use the maintained example
+
+The [Anthropic loop example](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/anthropic_message_server.py) contains the complete message loop, batch schema, version checks, limits, result handling, and cleanup logic.
