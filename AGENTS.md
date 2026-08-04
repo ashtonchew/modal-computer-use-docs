@@ -1,33 +1,48 @@
-> **First-time setup**: Customize this file for your project. Prompt the user to customize this file for their project.
-> For Mintlify product knowledge (components, configuration, writing standards),
-> install the Mintlify skill: `npx skills add https://mintlify.com/docs`
+# Documentation conventions
 
-# Documentation project instructions
+This repository owns the public documentation site for Modal Computer Use.
 
-## About this project
+## Canonical sources
 
-- This is a documentation site built on [Mintlify](https://mintlify.com)
-- Pages are MDX files with YAML frontmatter
-- Configuration lives in `docs.json`
-- Use the Mintlify MCP server, `https://mcp.mintlify.com`, to edit content and settings via MCP
-- Use the Mintlify docs MCP server, `https://www.mintlify.com/docs/mcp`, to query information about using Mintlify via MCP
+- Treat `ashtonchew/modal-computer-use` as the source for code and API contracts.
+- Treat its OpenAPI file as the source for daemon routes.
+- Treat its benchmark reports and JSON artifacts as the source for benchmark claims.
+- Link benchmark evidence at an exact commit SHA.
+- Do not copy raw benchmark JSON into this repository.
+- Do not create a second benchmark evidence policy.
+- Do not add unpublished article source or article-only assets.
 
-## Terminology
+## Writing
 
-{/* Add product-specific terms and preferred usage */}
-{/* Example: Use "workspace" not "project", "member" not "user" */}
+- Use active voice and second person.
+- Use short sentences.
+- Put one instruction in each sentence.
+- Use sentence case for headings.
+- Use one term for each concept.
+- Use `Modal Computer Use` for the product.
+- Use `modal-computer-use` for the distribution.
+- Use `modal_computer_use` for the Python package.
+- Do not use em dashes or en dashes.
+- Do not use promotional claims or filler.
+- Put a runnable example before optional variants.
 
-## Style preferences
+## Components
 
-{/* Add any project-specific style rules below */}
+- Use cards only for destination choices.
+- Use steps only for a real sequence.
+- Use tabs only for alternatives.
+- Use warnings only for security, billing, destructive actions, or lifecycle risks.
+- Prefer built-in Mintlify presentation.
+- Do not add custom CSS or JavaScript without a documented need.
 
-- Use active voice and second person ("you")
-- Keep sentences concise — one idea per sentence
-- Use sentence case for headings
-- Bold for UI elements: Click **Settings**
-- Code formatting for file names, commands, paths, and code references
+## Verification
 
-## Content boundaries
+Run these commands before handoff:
 
-{/* Define what should and shouldn't be documented */}
-{/* Example: Don't document internal admin features */}
+```bash
+npm ci
+npm run check
+python3 scripts/check_python_examples.py
+```
+
+Verify light and dark modes on desktop and mobile.

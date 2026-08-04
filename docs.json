@@ -1,97 +1,95 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "name": "modal-computer-use",
+  "name": "Modal Computer Use",
+  "description": "Deploy and control a Linux desktop in a Modal Sandbox.",
   "theme": "luma",
   "colors": {
     "primary": "#5B5BD6",
-    "light": "#EEF0FF",
-    "dark": "#1E1E3F"
+    "light": "#A5B4FC",
+    "dark": "#5B5BD6"
   },
-  "favicon": "/favicon.svg",
+  "styling": {
+    "eyebrows": "breadcrumbs",
+    "codeblocks": "system"
+  },
   "navigation": {
     "tabs": [
       {
         "tab": "Documentation",
+        "icon": "book-open",
         "groups": [
           {
-            "group": "Get Started",
+            "group": "Start",
             "pages": [
-              "introduction",
-              "quickstart",
-              "installation"
+              "index",
+              "start/installation",
+              "start/quickstart"
             ]
           },
           {
-            "group": "Core Concepts",
+            "group": "Build",
             "pages": [
-              "concepts/sandbox-lifecycle",
-              "concepts/namespaces",
-              "concepts/configuration",
-              "concepts/async-sync"
+              "build/create-and-attach",
+              "build/browser-automation",
+              "build/action-batches",
+              "build/screenshots-recordings",
+              "build/artifacts-storage",
+              "build/session-handoff"
             ]
           },
           {
-            "group": "Guides",
+            "group": "Integrate",
             "pages": [
-              "guides/modal-deployment",
-              "guides/browser-automation",
-              "guides/action-batches",
-              "guides/screenshots-recordings",
-              "guides/artifacts-storage",
-              "guides/session-handoff"
+              "integrate/openai",
+              "integrate/anthropic"
             ]
           },
           {
-            "group": "AI Provider Adapters",
+            "group": "Operate",
             "pages": [
-              "adapters/overview",
-              "adapters/openai",
-              "adapters/anthropic"
+              "operate/deploy",
+              "operate/configure",
+              "operate/warm-capacity",
+              "operate/performance",
+              "operate/security",
+              "operate/troubleshooting"
             ]
-          },
+          }
+        ]
+      },
+      {
+        "tab": "Benchmarks",
+        "icon": "stopwatch",
+        "groups": [
           {
-            "group": "Production",
+            "group": "Benchmarks",
             "pages": [
-              "production/optimization",
-              "production/warm-pool",
-              "production/security",
-              "production/troubleshooting"
+              "benchmarks/overview",
+              "benchmarks/run",
+              "benchmarks/current-results",
+              "benchmarks/latency-evidence",
+              "benchmarks/reproducibility"
             ]
           }
         ]
       },
       {
         "tab": "API Reference",
+        "icon": "code",
         "groups": [
           {
-            "group": "SDK Classes",
+            "group": "Python SDK",
             "pages": [
-              "reference/computer-sandbox",
-              "reference/async-computer-sandbox",
-              "reference/daemon-client",
-              "reference/sandbox-manager"
+              "reference/overview",
+              "reference/configuration",
+              "reference/namespaces",
+              "reference/errors-and-models"
             ]
           },
           {
-            "group": "Configuration",
+            "group": "Daemon API",
             "pages": [
-              "reference/config-models",
-              "reference/environment-variables"
-            ]
-          },
-          {
-            "group": "Namespaces",
-            "pages": [
-              "reference/namespaces/input",
-              "reference/namespaces/observation",
-              "reference/namespaces/filesystem"
-            ]
-          },
-          {
-            "group": "Errors & Models",
-            "pages": [
-              "reference/error-types",
-              "reference/data-models"
+              "reference/openapi"
             ]
           }
         ]
@@ -103,5 +101,75 @@
       "type": "github",
       "href": "https://github.com/ashtonchew/modal-computer-use"
     }
-  }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/ashtonchew/modal-computer-use"
+    },
+    "links": [
+      {
+        "header": "Project",
+        "items": [
+          {
+            "label": "GitHub",
+            "href": "https://github.com/ashtonchew/modal-computer-use"
+          },
+          {
+            "label": "PyPI",
+            "href": "https://pypi.org/project/modal-computer-use/"
+          },
+          {
+            "label": "Releases",
+            "href": "https://github.com/ashtonchew/modal-computer-use/releases"
+          }
+        ]
+      },
+      {
+        "header": "Support",
+        "items": [
+          {
+            "label": "Issues",
+            "href": "https://github.com/ashtonchew/modal-computer-use/issues"
+          },
+          {
+            "label": "Security",
+            "href": "https://github.com/ashtonchew/modal-computer-use/security/policy"
+          }
+        ]
+      }
+    ]
+  },
+  "redirects": [
+    { "source": "/introduction", "destination": "/" },
+    { "source": "/installation", "destination": "/start/installation" },
+    { "source": "/quickstart", "destination": "/start/quickstart" },
+    { "source": "/concepts/sandbox-lifecycle", "destination": "/build/create-and-attach" },
+    { "source": "/concepts/namespaces", "destination": "/reference/namespaces" },
+    { "source": "/concepts/configuration", "destination": "/operate/configure" },
+    { "source": "/concepts/async-sync", "destination": "/reference/overview" },
+    { "source": "/guides/modal-deployment", "destination": "/operate/deploy" },
+    { "source": "/guides/browser-automation", "destination": "/build/browser-automation" },
+    { "source": "/guides/action-batches", "destination": "/build/action-batches" },
+    { "source": "/guides/screenshots-recordings", "destination": "/build/screenshots-recordings" },
+    { "source": "/guides/artifacts-storage", "destination": "/build/artifacts-storage" },
+    { "source": "/guides/session-handoff", "destination": "/build/session-handoff" },
+    { "source": "/adapters/overview", "destination": "/integrate/openai" },
+    { "source": "/adapters/openai", "destination": "/integrate/openai" },
+    { "source": "/adapters/anthropic", "destination": "/integrate/anthropic" },
+    { "source": "/production/optimization", "destination": "/operate/performance" },
+    { "source": "/production/warm-pool", "destination": "/operate/warm-capacity" },
+    { "source": "/production/security", "destination": "/operate/security" },
+    { "source": "/production/troubleshooting", "destination": "/operate/troubleshooting" },
+    { "source": "/reference/computer-sandbox", "destination": "/reference/overview" },
+    { "source": "/reference/async-computer-sandbox", "destination": "/reference/overview" },
+    { "source": "/reference/daemon-client", "destination": "/reference/overview" },
+    { "source": "/reference/sandbox-manager", "destination": "/reference/overview" },
+    { "source": "/reference/config-models", "destination": "/reference/configuration" },
+    { "source": "/reference/environment-variables", "destination": "/reference/configuration" },
+    { "source": "/reference/namespaces/input", "destination": "/reference/namespaces" },
+    { "source": "/reference/namespaces/observation", "destination": "/reference/namespaces" },
+    { "source": "/reference/namespaces/filesystem", "destination": "/reference/namespaces" },
+    { "source": "/reference/error-types", "destination": "/reference/errors-and-models" },
+    { "source": "/reference/data-models", "destination": "/reference/errors-and-models" }
+  ]
 }
