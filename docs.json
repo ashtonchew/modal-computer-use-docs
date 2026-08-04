@@ -28,7 +28,8 @@
             "pages": [
               "index",
               "start/installation",
-              "start/quickstart"
+              "start/quickstart",
+              "start/examples"
             ]
           },
           {

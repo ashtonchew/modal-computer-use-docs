@@ -105,4 +105,4 @@ The Function leaves the desktop running when the borrow ends. Only the original 
   A cancelled Function invocation does not reverse desktop effects that already occurred. Your application must reconcile an ambiguous result before it starts a new trajectory.
 </Warning>
 
-Read the [complete executable example](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/modal_function_session_handoff.py) before you add dispatch, cancellation, or recovery logic.
+Use the [session handoff example](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/modal_function_session_handoff.py) when a Modal Function needs one complete stateful trajectory. It shows dispatch, cancellation, and observation after result loss. The owner must reconcile an ambiguous outcome before it starts another trajectory.

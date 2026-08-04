@@ -103,8 +103,6 @@ Use the hosted `computer` tool for these cases:
 - Recovery after a failure.
 - A step that depends on an intermediate screen.
 
-The [Anthropic loop example](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/anthropic_message_server.py) contains the reviewed custom schema for all supported tool versions.
-
 ## Supported actions
 
 All versions support mouse movement, clicks, drag, key input, typing, screenshots, and cursor position.
@@ -125,4 +123,4 @@ Treat the task, page content, screenshots, provider output, typed text, and clip
 
 ## Use the maintained example
 
-The [Anthropic loop example](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/anthropic_message_server.py) contains the complete message loop, batch schema, version checks, limits, result handling, and cleanup logic.
+Use the [Anthropic loop example](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/anthropic_message_server.py) when your application needs a batch tool between model turns. It includes the reviewed schemas, message loop, limits, result handling, and cleanup. Your application still owns policy for hosted actions, the custom batch tool, provider output retention, and model cost.
