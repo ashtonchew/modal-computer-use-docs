@@ -1,0 +1,53 @@
+---
+sidebarTitle: "Reproducibility"
+title: "Reproduce a benchmark"
+description: "Follow the canonical procedure and verify tracked Modal Computer Use benchmark evidence."
+
+---
+
+The application repository owns the benchmark procedure and evidence policy. This page gives you the shortest path to those sources.
+
+## 1. Open the canonical procedure
+
+Read the [benchmark procedure](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmarking.md) before you run a benchmark.
+
+It defines the timer boundaries, source-state rules, sample handling, sanitization, cost controls, cleanup checks, and publication gate.
+
+## 2. Select the evidence class
+
+Use the [benchmark data policy](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/README.md) to select an artifact type and storage location.
+
+Keep raw output in the ignored `benchmark-results/` directory. Promote only the sanitized artifact that the procedure permits.
+
+## 3. Run the benchmark
+
+Use the command for your measurement question. The [run benchmarks](./run) page lists the current commands.
+
+Record the exact source and harness revisions. Do not cite a branch name as evidence.
+
+## 4. Verify the result
+
+Run the focused evidence tests.
+
+```bash
+uv run pytest tests/benchmarks
+```
+
+Run the full repository gate before you publish a report.
+
+```bash
+uv run ruff check .
+uv run mypy src
+uv run pytest
+uv run python scripts/export_openapi.py --check
+```
+
+The [July 30 report](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmark-results-2026-07-30-warm-paths.md) shows how a report binds its source revisions and input artifacts.
+
+## 5. Cite tracked evidence
+
+Link each claim to the exact application commit that contains its report or artifact. State any limit that prevents independent recalculation.
+
+<Note>
+The documentation site explains how to find and read the evidence. The application repository remains the only source for benchmark rules, reports, and artifacts.
+</Note>

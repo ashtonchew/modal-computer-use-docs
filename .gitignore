@@ -1,0 +1,4 @@
+node_modules/
+.mintlify/
+.atlas-analysis.json
+.DS_Store

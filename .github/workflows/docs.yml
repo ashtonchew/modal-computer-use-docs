@@ -1,0 +1,57 @@
+name: Docs
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: npm
+          package-manager-cache: false
+
+      - name: Install documentation dependencies
+        run: npm ci
+
+      - name: Validate the Mintlify site
+        run: npm run check
+
+      - name: Check Python examples
+        run: python3 scripts/check_python_examples.py
+
+      - name: Check the released API contract
+        run: |
+          python3 -m pip install "modal-computer-use[modal]==1.1.0"
+          python3 scripts/check_api_contract.py
+
+      - name: Install Vale
+        env:
+          VALE_VERSION: "3.14.0"
+          VALE_SHA256: "b858e4455a30c716b20c1df80616cbaf4ea1b187fdad4c1f833f12717c1c7233"
+        run: |
+          curl --fail --location --silent --show-error \
+            "https://github.com/vale-cli/vale/releases/download/v${VALE_VERSION}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz" \
+            --output /tmp/vale.tar.gz
+          echo "${VALE_SHA256}  /tmp/vale.tar.gz" | sha256sum --check --strict
+          tar --extract --gzip --file /tmp/vale.tar.gz --directory /tmp vale
+
+      - name: Check documentation style
+        run: /tmp/vale --minAlertLevel=error .

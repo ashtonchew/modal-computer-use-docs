@@ -1,0 +1,56 @@
+---
+sidebarTitle: "Current results"
+title: "Current benchmark results"
+description: "View the current July 30 warm-operation benchmark results and their comparison limits."
+
+---
+
+The current report was recorded on July 30, 2026. It measures warm operations after the desktop and connection were ready. It excludes Sandbox creation and cleanup.
+
+Each cell contains 30 successful samples. Values are milliseconds. The ratio divides the provider path p50 by the Modal optimized p50 for the same case.
+
+## Warm-operation results
+
+Lower is better.
+
+[![Warm-operation p50 latency on July 30, 2026. The Modal optimized path recorded the lowest p50 in each displayed row. The caller topology and configuration differed by path.](https://raw.githubusercontent.com/ashtonchew/modal-computer-use/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/assets/warm-operation-p50-2026-07-30.svg)](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmark-results-2026-07-30-warm-paths.md)
+
+| Case | Modal optimized p50 / p95 | Daytona p50 / p95 / ratio | E2B p50 / p95 / ratio | Modal simple p50 / p95 / ratio | Tzafon p50 / p95 / ratio |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Screenshot | 37.25 / 48.76 | 563.57 / 603.79 / 15.13x | 198.78 / 223.20 / 5.34x | 115.80 / 132.91 / 3.11x | 154.25 / 192.53 / 4.14x |
+| One click | 9.85 / 16.85 | 386.40 / 394.19 / 39.22x | 209.86 / 213.42 / 21.30x | 214.09 / 218.19 / 21.73x | 130.27 / 170.55 / 13.22x |
+| Four ordered clicks | 12.52 / 22.07 | 1546.74 / 1577.44 / 123.50x | 860.68 / 897.95 / 68.72x | 230.10 / 235.09 / 18.37x | 458.03 / 499.49 / 36.57x |
+| Type 100 characters | 15.76 / 28.15 | 805.55 / 812.84 / 51.11x | 4083.30 / 4156.65 / 259.08x | 259.67 / 270.18 / 16.48x | 85.16 / 101.65 / 5.40x |
+| Type 1000 characters | 53.35 / 79.69 | 5528.38 / 5554.88 / 103.63x | 40914.66 / 41374.28 / 766.95x | 263.95 / 269.71 / 4.95x | 185.03 / 188.37 / 3.47x |
+| Shell command | 11.69 / 14.12 | 285.33 / 294.57 / 24.40x | 55.90 / 69.27 / 4.78x | 72.64 / 158.22 / 6.21x | 31.73 / 33.35 / 2.71x |
+
+## What the paths measure
+
+Modal optimized used a colocated Function and target. Both requested `us-west-2`, 1 CPU, and 2 GiB. The path used attested-tunnel HTTP/1.1, XTest input, zero pacing, and the isolated asyncio subprocess backend.
+
+The provider-default paths used their documented public SDKs. Modal simple used standard resources, default pacing, and an external caller. The other provider paths also used an external caller.
+
+All timers include transport, authentication, request handling, operation execution, and response collection.
+
+## Comparison limits
+
+The shared region request does not prove the same host or availability zone.
+
+Screenshot formats differ. Tzafon returned a 1280 by 720 JPEG. The other paths returned a 1024 by 768 PNG.
+
+The four-click request shape differs. Modal optimized, Modal simple, and Tzafon used one request. Daytona used four SDK calls. E2B used four SDK calls through eight transport calls.
+
+The Modal optimized path and provider-default paths also differ in caller topology and configuration. Treat the ratios as path comparisons. Do not use them as isolated provider rankings.
+
+Native async provider APIs became available after these measurements. The July 30 report measured the synchronous colocated path only.
+
+## Sources
+
+- [Current July 30 report](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmark-results-2026-07-30-warm-paths.md)
+- [Modal optimized artifact](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-optimized-provider-2026-07-30.json)
+- [Provider comparison artifact](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/provider-compare-coordinate-command-2026-07-30.json)
+- [Archived July 26 report](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/archive/benchmarks/benchmark-results-2026-07-26-provider-results.md)
+
+<Note>
+  July 30 is the current provider report. July 26 is archived and does not replace these values.
+</Note>
