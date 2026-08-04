@@ -48,6 +48,26 @@ function evidenceReferences(source) {
   );
 }
 
+function hasSafeFrontmatter(lines) {
+  const quotedMetadataLine = /^(title|sidebarTitle|description): "[^"\n]*"$/;
+  const booleanMetadataLine = /^(hideFooterPagination): true$/;
+  const counts = new Map();
+
+  for (const line of lines) {
+    const match = quotedMetadataLine.exec(line) ?? booleanMetadataLine.exec(line);
+    if (match === null) return false;
+    counts.set(match[1], (counts.get(match[1]) ?? 0) + 1);
+  }
+
+  return (
+    counts.get("title") === 1 &&
+    counts.get("sidebarTitle") === 1 &&
+    counts.get("description") === 1 &&
+    (counts.get("hideFooterPagination") ?? 0) <= 1 &&
+    lines.length === 3 + (counts.has("hideFooterPagination") ? 1 : 0)
+  );
+}
+
 export async function validateDocs(rootPath = repositoryRoot) {
   const errors = [];
   const files = await walk(rootPath);
@@ -61,12 +81,10 @@ export async function validateDocs(rootPath = repositoryRoot) {
     const source = await readFile(file, "utf8");
     const frontmatter = source.match(/^---\n([\s\S]*?)\n---\n/)?.[1] ?? "";
     const frontmatterLines = frontmatter.split("\n").filter(Boolean);
-    const allowedFrontmatterLine = /^(?:title|sidebarTitle|description): "[^"\n]*"$/;
-    if (
-      frontmatterLines.length !== 3 ||
-      frontmatterLines.some((line) => !allowedFrontmatterLine.test(line))
-    ) {
-      errors.push(`${relativePath}: use only quoted title, sidebarTitle, and description metadata`);
+    if (!hasSafeFrontmatter(frontmatterLines)) {
+      errors.push(
+        `${relativePath}: use only quoted title, sidebarTitle, and description metadata plus optional hideFooterPagination: true`,
+      );
     }
     if (!/^title:\s*.+$/m.test(frontmatter)) {
       errors.push(`${relativePath}: add valid frontmatter with a title`);

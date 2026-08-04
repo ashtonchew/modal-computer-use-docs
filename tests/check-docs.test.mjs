@@ -30,6 +30,20 @@ test("accepts a valid documentation tree", async (context) => {
   assert.deepEqual((await validateDocs(root)).errors, []);
 });
 
+test("accepts the supported footer pagination flag", async (context) => {
+  const metadata = frontmatter.replace(/\n---\n$/, "\nhideFooterPagination: true\n---\n");
+  const root = await fixture(`${metadata}\nValid page.\n`);
+  context.after(() => rm(root, { recursive: true, force: true }));
+  assert.deepEqual((await validateDocs(root)).errors, []);
+});
+
+test("rejects unsupported footer pagination values", async (context) => {
+  const metadata = frontmatter.replace(/\n---\n$/, "\nhideFooterPagination: false\n---\n");
+  const root = await fixture(`${metadata}\nValid page.\n`);
+  context.after(() => rm(root, { recursive: true, force: true }));
+  assert.match((await validateDocs(root)).errors.join("\n"), /hideFooterPagination: true/);
+});
+
 test("rejects metadata that can reach unsafe YAML features", async (context) => {
   const root = await fixture(`---
 title: "Test"
