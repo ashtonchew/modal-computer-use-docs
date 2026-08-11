@@ -54,11 +54,10 @@ test("documents the placed Step path and its measurement boundary", async () => 
 
   const results = await source("benchmarks/current-results.mdx");
   assert.match(results, /44\.29 ms/);
-  assert.match(results, /47\.10 ms/);
-  assert.match(results, /combined separate screenshot and click medians/);
+  assert.match(results, /47\.14 ms/);
 });
 
-test("keeps current guides product-led and leaves benchmark history with results", async () => {
+test("keeps current guides product-led and historical arithmetic out of current pages", async () => {
   const home = await source("index.mdx");
   assert.match(home, /title: "Build computer-use agents on Modal"/);
   assert.match(home, /computer\.step/);
@@ -79,7 +78,7 @@ test("keeps current guides product-led and leaves benchmark history with results
       historicalArithmeticPages.push(path);
     }
   }
-  assert.deepEqual(historicalArithmeticPages, ["benchmarks/current-results.mdx"]);
+  assert.deepEqual(historicalArithmeticPages, []);
 });
 
 test("documents current defaults and opt-in runtime features", async () => {
