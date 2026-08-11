@@ -1,65 +1,71 @@
 ---
-title: "Run a placed computer trajectory"
-sidebarTitle: "Home"
-description: "Create one Modal desktop and control it from one placed Modal Function."
+title: "Build computer-use agents on Modal"
+sidebarTitle: "Overview"
+description: "Run a Linux desktop in a Modal Sandbox and control it with Python."
 ---
 
-Modal Computer Use provides a typed Python SDK and an in-Sandbox daemon. Your application owns the
-model loop. The SDK owns Modal orchestration. The daemon executes desktop primitives inside the
-Sandbox.
+Modal Computer Use gives Python applications a Linux desktop with screenshots, native input,
+browser control, commands, and artifacts. The desktop runs in a Modal Sandbox. A colocated Modal
+Function runs your model loop.
 
-This is an independent project that uses Modal.
-
-## Use the primary path
-
-The 2.x path has one owner and one borrower:
-
-1. An async owner creates the desktop once.
-2. The owner creates a versioned session handle.
-3. The owner sends the handle to an explicitly placed Modal Function.
-4. The Function enters one `borrow_async()` context for the trajectory.
-5. Each model action array uses one `computer.step()` call.
-6. The borrower releases its lease before the owner cleans up the desktop.
-
-`computer.step()` validates and runs one ordered action array. It returns the action result and one
-immediate post-action screenshot. Your application defines readiness and task success.
-
-<CardGroup cols={2}>
-  <Card title="Install" href="/start/installation">
-    Install version 2 and set up Modal credentials.
+<CardGroup cols={3}>
+  <Card title="Quickstart" href="/start/quickstart" icon="bolt">
+    Create a desktop and run your first placed trajectory.
   </Card>
-  <Card title="Run the quickstart" href="/start/quickstart">
-    Deploy one Function and run one borrowed trajectory.
+  <Card title="OpenAI" href="/integrate/openai" icon="brain">
+    Connect the Responses API to the computer.
   </Card>
-  <Card title="Integrate OpenAI" href="/integrate/openai">
-    Keep the Responses API loop in your application.
-  </Card>
-  <Card title="Integrate Anthropic" href="/integrate/anthropic">
-    Keep the Messages API loop in your application.
-  </Card>
-  <Card title="Configure cost" href="/operate/configure">
-    Select region, resources, image, and capacity explicitly.
-  </Card>
-  <Card title="Read the migration guide" href="/reference/overview">
-    Move a 1.x primitive loop to the placed 2.x path.
+  <Card title="Anthropic" href="/integrate/anthropic" icon="message">
+    Connect the Messages API to the computer.
   </Card>
 </CardGroup>
 
-## Choose the right surface
+## Write the model loop
 
-| Need | Interface |
-| --- | --- |
-| Repeated model turns | One placed Function, one borrow, and `computer.step()` |
-| Initial or screenshot-only observation | `computer.screenshots.full()` |
-| Local daemon work | `DaemonClient.local()` or `AsyncDaemonClient.local()` |
-| Direct REST or debugging | The retained daemon routes and OpenAPI schema |
-| Compatibility without handoff | Explicit low-level create, attach, and direct-client paths |
+Your application owns model calls and conversation state. Borrow the desktop once, then use
+`computer.step()` for each ordered action array.
 
-Low-level paths remain supported for callers that establish and own their topology explicitly.
+```python
+async with handle.borrow_async(
+    run_id=run_id,
+    function_region="us-west-2",
+) as computer:
+    screenshot = await computer.screenshots.full()
 
-## Understand the latency evidence
+    while task_is_running:
+        actions = await call_model(screenshot)
+        result = await computer.step(actions)
+        screenshot = result.screenshot
+```
 
-The article's 47.10 ms value adds separate 37.25 ms screenshot and 9.85 ms click medians. A later
-fixed-topology benchmark measured the fused `computer.step()` path at 44.29 ms p50 and 52.57 ms
-p95. Read the [current benchmark results](/benchmarks/current-results) for both measurement scopes
-and source revisions.
+Step validates the complete array before mutation, runs the actions in order, and returns the action
+results with an immediate screenshot. Your application decides when the target application is
+ready and whether the task succeeded.
+
+## Keep the trajectory close to the desktop
+
+1. Create the desktop once with an async owner.
+2. Send its session handle to a Function in the same exact region.
+3. Keep one borrow and one pooled client for the model loop.
+4. Release the borrow before the owner closes the desktop.
+
+The [quickstart](/start/quickstart) shows the complete owner, Function, and cleanup flow.
+
+## Choose a guide
+
+<CardGroup cols={2}>
+  <Card title="Install the SDK" href="/start/installation" icon="download">
+    Install the package and set up Modal credentials.
+  </Card>
+  <Card title="Control the browser" href="/build/browser-automation" icon="browser">
+    Open pages, inspect browser status, and choose an Image.
+  </Card>
+  <Card title="Deploy the application" href="/operate/deploy" icon="cloud-arrow-up">
+    Set placement, resources, ownership, and cleanup.
+  </Card>
+  <Card title="Browse the API" href="/reference/overview" icon="code">
+    Find SDK entry points, namespaces, models, and daemon routes.
+  </Card>
+</CardGroup>
+
+Modal Computer Use is independently maintained and uses Modal as its runtime.
