@@ -1,0 +1,85 @@
+---
+title: "Troubleshoot a desktop"
+sidebarTitle: "Troubleshooting"
+description: "Diagnose readiness, X11 input, screenshots, adapters, storage, and warm capacity."
+---
+
+## The daemon is alive but not ready
+
+`/healthz` checks the daemon process. `/readyz` also checks Xvfb, the input backend, the window manager, screenshots, and noVNC when enabled.
+
+Read the per-check failure list from `/readyz`. Modal's TCP probe can pass before desktop readiness passes.
+
+Use `computer.processes.logs("xvfb")` when Xvfb fails. Confirm that `DISPLAY` matches the configured display. The default is `:99`.
+
+## A screenshot is black or empty
+
+Wait for `/readyz`. Confirm that the target application has a mapped window.
+
+Use `computer.windows.wait_for(...)` after you launch an application. An immediate screenshot can arrive before the window manager draws the first frame.
+
+## Keyboard input does not appear
+
+Activate the target window before you send input. Confirm that the daemon uses the intended `DISPLAY`.
+
+Set `COMPUTER_USE_INPUT_BACKEND=xtest` to test the native path. Set it to `xdotool` to test the compatibility path.
+
+For Unicode text, use `method="auto"`. The daemon uses native keystrokes when the active layout can represent the text. It uses clipboard paste for long or unmapped text and then restores the prior clipboard.
+
+Do not replay an input action after `input_may_be_partial`. The first attempt might have changed the desktop.
+
+## Identify the active backend
+
+Read these response headers for one successful direct request:
+
+| Header | Operation |
+| --- | --- |
+| `X-Computer-Use-Input-Backend` | Mouse or keyboard input. |
+| `X-Computer-Use-Window-Backend` | Window control. |
+| `X-Computer-Use-Capture-Backend` | Raw screenshot capture. |
+
+Use `/v1/capabilities` for process configuration and readiness. Do not use the legacy last-selected backend field to attribute concurrent requests.
+
+## Provider actions click the wrong place
+
+The provider image and desktop use different coordinate spaces. Pass `CoordinateSpace` to the adapter. Use the dimensions of the exact screenshot that you sent to the model.
+
+## A recording is empty or damaged
+
+Stop the recording with `computer.recordings.stop(...)` before you terminate the Sandbox. This lets ffmpeg write its trailer.
+
+Inspect the sanitized `Recording.error` value when stop fails.
+
+## Persisted artifacts are missing
+
+Ephemeral artifacts disappear when the Sandbox ends.
+
+For Modal Volume v2, mount the Volume over the artifact path. Set `StorageConfig(persist_artifacts=True)`. Call `computer.artifacts.sync()` before termination.
+
+Reload an already-mounted reader before you check for committed data. Use a run-specific path. Do not let two writers replace the same file.
+
+Modal Volume v1 is not a supported immediate-sync target for this package.
+
+## Browser prewarm did not help
+
+Confirm that `/v1/capabilities` reports `browser` or `browser-gpu` as the image profile. Prewarm removes browser startup from the first navigation. It does not reduce page network time, authentication time, or application rendering time.
+
+For GPU tests, read `/v1/browser/status`. A Modal GPU allocation alone does not prove hardware browser rendering.
+
+## A warm-pool candidate expired
+
+Set `min_remaining_seconds` to cover the expected task. The claim path rejects a candidate without enough lifetime.
+
+Always check `/readyz` after attach. A listed Sandbox can be stopping or recovering.
+
+## A filesystem snapshot lacks GUI state
+
+Use directory snapshots for files and installed application state. Do not use them to preserve live windows, process memory, or an authenticated browser session.
+
+Create a normal computer-use Sandbox. Mount the snapshot image into the required path. Start the applications again. Verify readiness.
+
+## A noVNC URL was shared
+
+<Warning>
+Treat the URL as compromised. Terminate the Sandbox immediately. Create a new Sandbox to receive a new tunnel and generated password.
+</Warning>

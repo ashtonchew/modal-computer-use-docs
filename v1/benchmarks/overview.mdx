@@ -1,0 +1,56 @@
+---
+sidebarTitle: "Overview"
+title: "Benchmark overview"
+description: "Read modal-computer-use benchmark results with their measurement boundaries and evidence status."
+---
+
+The benchmark suite measures lifecycle latency, warm operation latency, and focused implementation effects. Each dated report states what the timer includes. Read that boundary before you compare values.
+
+## Start with the current report
+
+The current provider report is the [July 30 warm-operation report](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmark-results-2026-07-30-warm-paths.md). It compares six warm operations. Each result cell contains 30 successful samples.
+
+The chart compares complete warm-operation paths. The tested setups differ.
+
+[![Warm-operation p50 latency for six tasks on July 30, 2026. Modal optimized recorded the lowest p50 in each task. The tested setups differed.](https://raw.githubusercontent.com/ashtonchew/modal-computer-use/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/assets/warm-operation-p50-2026-07-30.svg)](/v1/benchmarks/current-results)
+
+## Choose the right page
+
+<CardGroup cols={2}>
+  <Card title="Run a benchmark" href="/v1/benchmarks/run" icon="play">
+    Select a credential-free or live benchmark command.
+  </Card>
+  <Card title="Current results" href="/v1/benchmarks/current-results" icon="chart-column">
+    Read the July 30 warm-operation table and its limits.
+  </Card>
+  <Card title="Latency evidence" href="/v1/benchmarks/latency-evidence" icon="microscope">
+    Review batching, subprocess, native X11, and cost evidence.
+  </Card>
+  <Card title="Reproducibility" href="/v1/benchmarks/reproducibility" icon="rotate">
+    Check source state, samples, validation, cost, and cleanup.
+  </Card>
+</CardGroup>
+
+## Read a result correctly
+
+For 20 or more successful observations, reports show p50 and p95. The implementation uses rank `0.95 * (n - 1)` and linear interpolation for p95. For fewer than 20 observations, use the median and the observed range instead of p95 as headline evidence.
+
+Do not compare values with different timer boundaries. Keep these boundaries separate:
+
+- Sandbox creation and readiness
+- Action acknowledgement
+- Immediate screenshot capture
+- Hash-confirmed first visual change
+- Application readiness
+
+The current warm-operation timers include transport, authentication, request handling, execution, and response collection. They exclude Sandbox creation and cleanup.
+
+## Evidence locations
+
+The [benchmark procedure](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmarking.md) owns the run and reporting rules. The [benchmark data policy](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/README.md) owns tracked artifact eligibility.
+
+Tracked, sanitized evidence is in `benchmark-data/`. Raw output, candidates, rejected runs, and replay inputs stay in ignored `benchmark-results/`.
+
+<Note>
+  A tracked artifact can support a narrow claim without replacing an earlier result. Check its status, scope, and limitations.
+</Note>

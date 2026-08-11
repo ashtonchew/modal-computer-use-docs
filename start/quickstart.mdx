@@ -1,61 +1,92 @@
 ---
-title: "Create your first desktop"
+title: "Run your first placed trajectory"
 sidebarTitle: "Quickstart"
-description: "Create a browser desktop, open a page, and save a screenshot."
+description: "Create one desktop and lend it to one placed Modal Function."
 ---
 
-This guide creates one Modal Sandbox. The SDK terminates it when the Python context ends.
+This quickstart keeps the desktop owner outside the Function. The Function borrows the desktop once
+for the complete trajectory.
 
-## Install and authenticate
+## Set explicit application choices
 
-```bash
-uv add "modal-computer-use[modal]"
-uv run modal setup
-```
-
-## Create the script
-
-Save this file as `quickstart.py`:
+Use one exact region for the Function and Sandbox. Replace `us-west-2` with a region measured for
+your workload.
 
 ```python
-from modal_computer_use import (
-    BrowserConfig,
-    ComputerConfig,
-    ComputerSandbox,
-    ResourceConfig,
+import modal
+from modal_computer_use import AsyncComputerSandbox, ComputerConfig, ComputerSessionHandle
+
+APP_NAME = "computer-use-quickstart"
+ENVIRONMENT = "main"
+REGION = "us-west-2"
+
+app = modal.App(APP_NAME)
+image = modal.Image.debian_slim(python_version="3.12").pip_install(
+    "modal-computer-use[modal]==2.0.0"
 )
+```
+
+## Define the placed Function
+
+Keep your model call in this Function. The placeholder action below lets the example compile
+without a provider SDK.
+
+```python
+@app.function(
+    image=image,
+    region=REGION,
+    cpu=1.0,
+    memory=2048,
+    retries=0,
+    min_containers=0,
+    max_containers=4,
+    timeout=900,
+)
+async def run_trajectory(handle: ComputerSessionHandle, run_id: str):
+    async with handle.borrow_async(run_id=run_id, function_region=REGION) as computer:
+        screenshot = await computer.screenshots.full(format="png")
+        actions = [{"type": "wait", "duration_ms": 50}]
+        step = await computer.step(actions, continue_on_error=False)
+        screenshot = step.screenshot
+        return {"status": "succeeded", "sha256": screenshot.sha256}
+```
+
+## Create and own the desktop
+
+```python
+import uuid
 
 config = ComputerConfig(
-    resources=ResourceConfig(profile="browser"),
-    browser=BrowserConfig(kind="chromium"),
+    ingress="attested-tunnel",
+    runtime={
+        "modal_environment": ENVIRONMENT,
+        "modal_region": REGION,
+        "timeout_seconds": 900,
+        "readiness_timeout_seconds": 120,
+    },
+    resources={"profile": "browser", "cpu": 1.0, "memory_mib": 2048},
+    image={"source": "inline"},
+    browser={"kind": "chromium", "prewarm": False},
 )
 
-with ComputerSandbox.create(config=config) as computer:
-    computer.browser.open_url("https://example.com")
-    computer.mouse.move(320, 240)
-    screenshot = computer.screenshots.full(show_cursor=True)
-    screenshot.save("screenshot.png")
-    print(
-        {
-            "width": screenshot.width,
-            "height": screenshot.height,
-            "sha256": screenshot.sha256,
-        }
-    )
+async with AsyncComputerSandbox.create(config=config, app_name=APP_NAME) as owner:
+    handle = owner.session_handle()
+    result = await run_trajectory.remote.aio(handle, f"trajectory_{uuid.uuid4().hex}")
 ```
 
-## Run the script
+The owner waits for the Function result before it closes. Borrow cleanup runs first. Owner cleanup
+then terminates the desktop.
+
+## Deploy the Function
+
+Save the code in one module, then deploy it to the same explicit environment:
 
 ```bash
-uv run python quickstart.py
+uv run modal deploy --env main quickstart.py
 ```
 
-The script writes `screenshot.png` in the current directory. The printed SHA-256 digest identifies the captured bytes.
+Invoking the Function and creating the Sandbox can incur Modal charges. Warm capacity remains off
+because `min_containers=0` and this example creates no Sandbox pool.
 
-## Understand ownership
-
-`ComputerSandbox.create()` owns the Sandbox that it creates. The context terminates that Sandbox on exit.
-
-`ComputerSandbox.attach()` does not take ownership. Its context closes the local connection and keeps the existing Sandbox running.
-
-Read [Create and attach](/build/create-and-attach) before you keep a desktop between processes.
+Use the maintained [session-handoff example](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/examples/modal_function_session_handoff.py)
+for cancellation, spawning, resolved configuration, and recovery handling.

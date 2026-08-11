@@ -1,0 +1,99 @@
+---
+title: "Store and persist artifacts"
+sidebarTitle: "Artifacts and storage"
+description: "Read, write, download, and persist files under the artifact root."
+---
+
+The default artifact root is `/home/desktop/artifacts`. Public artifact methods accept safe relative paths under that root.
+
+## Write and read an artifact
+
+```python
+info = computer.artifacts.write_bytes(
+    "runs/example/result.txt",
+    b"hello\n",
+    "text/plain",
+)
+data = computer.artifacts.read_bytes("runs/example/result.txt")
+print(info.size_bytes, len(data))
+```
+
+Use a separate prefix for each run. This prevents unrelated runs from writing the same file.
+
+## Upload and download files
+
+```python
+from pathlib import Path
+
+computer.artifacts.upload(
+    Path("input.txt"),
+    "runs/example/input.txt",
+)
+computer.artifacts.download(
+    "runs/example/input.txt",
+    Path("downloads/input.txt"),
+)
+```
+
+List or delete public artifacts with the same relative paths:
+
+```python
+items = computer.artifacts.list(prefix="runs/example")
+computer.artifacts.delete("runs/example/input.txt")
+```
+
+`logs/`, `manifest.ndjson`, and `traces/actions.ndjson` are internal control paths. Read process logs through `computer.processes.logs()` or `computer.processes.stderr()`.
+
+## Understand default storage
+
+Artifact files use the Sandbox filesystem by default. They disappear when the Sandbox terminates.
+
+Mount a Modal Volume v2 when files must remain after termination. Set `persist_artifacts=True` and call `computer.artifacts.sync()` before you terminate the Sandbox.
+
+## Persist to a Modal Volume v2
+
+```python
+import modal
+from modal_proto import api_pb2
+
+from modal_computer_use import ComputerConfig, ComputerSandbox, StorageConfig
+
+artifacts_dir = "/home/desktop/artifacts"
+volume = modal.Volume.from_name(
+    "computer-use-artifacts",
+    create_if_missing=False,
+    version=api_pb2.VolumeFsVersion.Value("VOLUME_FS_VERSION_V2"),
+).hydrate()
+
+computer = ComputerSandbox.create(
+    config=ComputerConfig(
+        run_id="replace-with-a-unique-run-id",
+        storage=StorageConfig(persist_artifacts=True),
+    ),
+    volumes={artifacts_dir: volume},
+    wait=False,
+)
+try:
+    computer.wait_until_ready()
+    computer.artifacts.write_bytes(
+        "runs/example/result.txt",
+        b"hello\n",
+        "text/plain",
+    )
+    sync = computer.artifacts.sync()
+    if not sync.ok or not sync.persistent:
+        raise RuntimeError("artifact sync did not persist")
+finally:
+    try:
+        computer.terminate(wait=True)
+    finally:
+        computer.detach()
+```
+
+The sync contract supports Modal Volume v2. Modal Volume v1 is not a supported immediate-sync target for this package.
+
+An existing reader must reload its Volume view after the writer commits. Avoid concurrent writes to one path because Volume conflict resolution uses the last writer.
+
+<Warning>
+  Artifact paths and URIs can reveal run details. Do not log them unless your logging policy permits that data.
+</Warning>

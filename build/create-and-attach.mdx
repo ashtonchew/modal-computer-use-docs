@@ -1,104 +1,70 @@
 ---
-title: "Create and attach to desktops"
+title: "Create, attach, and borrow"
 sidebarTitle: "Create and attach"
-description: "Choose a Modal Sandbox lifecycle and keep ownership explicit."
+description: "Choose the lifecycle and cleanup contract for one Modal desktop."
 ---
 
-Use `create()` when your process owns a new desktop. Use `attach()` when another process owns an existing desktop.
+## Create an owner for the primary path
 
-## Create an owned desktop
-
-```python
-from modal_computer_use import ComputerSandbox
-
-with ComputerSandbox.create() as computer:
-    status = computer.status()
-    print(status.ready)
-```
-
-The context waits for daemon readiness. It terminates the created Sandbox on exit.
-
-Set `wait=False` when you need to do other work before readiness:
+`AsyncComputerSandbox.create()` requires an explicit Modal environment and exact region. It also
+requires an ingress and ownership mode that can produce a session handle. Invalid handoff settings
+fail before Modal allocation.
 
 ```python
-computer = ComputerSandbox.create(wait=False)
-try:
-    computer.wait_until_ready(timeout=120.0)
-    print(computer.status().ready)
-finally:
-    computer.terminate(wait=True)
-    computer.detach()
-```
+from modal_computer_use import AsyncComputerSandbox, ComputerConfig
 
-## Attach without taking ownership
-
-Pass exactly one selector. You can use `sandbox_id`, `name`, or `run_id` for a Modal-backed attachment.
-
-```python
-from modal_computer_use import ComputerSandbox
-
-computer = ComputerSandbox.attach(
-    sandbox_id="sb-REPLACE_ME",
-    wait=True,
-    readiness_timeout=120.0,
+config = ComputerConfig(
+    runtime={"modal_environment": "main", "modal_region": "us-west-2"},
+    resources={"profile": "browser", "cpu": 1.0, "memory_mib": 2048},
+    browser={"kind": "chromium"},
 )
-try:
-    print(computer.status().ready)
-finally:
-    computer.detach()
+
+async with AsyncComputerSandbox.create(config=config, app_name="my-app") as owner:
+    handle = owner.session_handle()
 ```
 
-`detach()` closes the daemon connection and releases the local Modal handle. It does not terminate the attached Sandbox.
+The owner terminates its desktop on exit. Keep it open until every dispatched Function call reaches
+a terminal outcome.
 
-<Warning>
-  Call `terminate()` on an attached desktop only when your process has authority to stop its owner's Sandbox.
-</Warning>
-
-## Acquire a named desktop
-
-Use `attach_or_create()` when a name is your allocation key:
+## Borrow inside the placed Function
 
 ```python
-from modal_computer_use import ComputerConfig, ComputerSandbox
-
-with ComputerSandbox.attach_or_create(
-    name="support-desktop",
-    config=ComputerConfig(),
+async with handle.borrow_async(
+    run_id=run_id,
+    function_region="us-west-2",
 ) as computer:
-    print(computer.status().ready)
+    initial = await computer.screenshots.full()
+    step = await computer.step(actions)
 ```
 
-The SDK attaches to a compatible live Sandbox with that app-scoped name. It creates one if none exists. The context terminates only a Sandbox that this call created.
+Borrowing acquires one trajectory lease and one pooled client. It verifies placement, readiness,
+protocol capabilities, and policy before mutation. The borrower releases the lease and detaches.
+It never terminates the owner's desktop.
 
-An existing named Sandbox must match the expected configuration tags. Use `attach(name=...)` when you intentionally connect to a legacy target.
+## Attach without ownership
 
-## Use native async lifecycle methods
-
-The async lifecycle methods are async context managers:
+Use one explicit selector when a desktop already has an owner:
 
 ```python
-import asyncio
+from modal_computer_use import ComputerSandbox
 
-from modal_computer_use import AsyncComputerSandbox
-
-
-async def main() -> None:
-    async with AsyncComputerSandbox.create() as computer:
-        screenshot = await computer.screenshots.full()
-        print(screenshot.width, screenshot.height)
-
-
-asyncio.run(main())
+with ComputerSandbox.attach(sandbox_id=sandbox_id, wait=True) as computer:
+    status = computer.lifecycle.status()
 ```
 
-Do not await `AsyncComputerSandbox.create()` directly. Enter the returned context manager with `async with`.
+An attached context closes its connection on exit and leaves the Sandbox running.
 
-## Lifecycle summary
+## Use an explicit low-level owner
 
-| Construction path | Context exit |
-| --- | --- |
-| `create()` | Terminates and detaches the created Sandbox |
-| `attach()` | Detaches and keeps the existing Sandbox running |
-| Existing branch of `attach_or_create()` | Detaches and keeps the existing Sandbox running |
-| Created branch of `attach_or_create()` | Terminates and detaches the created Sandbox |
-| `local()` or direct `base_url` | Closes the daemon connection only |
+`AsyncComputerSandbox.create_unplaced()` supports compatibility workflows with caller-owned
+topology. Local clients and direct daemon clients remain available for debugging and REST use.
+
+## Keep cleanup order stable
+
+1. Stop new mutations.
+2. Resolve or seal an ambiguous outcome.
+3. Close the borrowed client and release its lease.
+4. Wait for the Function call to reach a terminal state.
+5. Close the owner client and terminate the owned Sandbox.
+
+Cancellation leaves any input that reached the desktop in place for explicit recovery.

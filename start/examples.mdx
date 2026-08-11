@@ -1,44 +1,19 @@
 ---
 title: "Choose an example"
 sidebarTitle: "Examples"
-description: "Choose a maintained Modal Computer Use example for your lifecycle, provider, or storage use case."
+description: "Choose a maintained example for the placed or low-level SDK path."
 ---
 
-Start with the example that matches your use case. Each card links to a maintained example in the application repository.
+| Need | Example | Path |
+| --- | --- | --- |
+| Primary placed trajectory | [`modal_function_session_handoff.py`](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/examples/modal_function_session_handoff.py) | Primary |
+| OpenAI model loop | [`03_openai_computer_loop.py`](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/examples/03_openai_computer_loop.py) | Primary |
+| Anthropic model loop | [`anthropic_message_server.py`](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/examples/anthropic_message_server.py) | Primary |
+| Application run gateway | [`modal_run_gateway.py`](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/examples/modal_run_gateway.py) | Advanced application pattern |
+| Direct local daemon | [`local_daemon.py`](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/examples/local_daemon.py) | Low-level |
 
-<Warning>
-  Some examples create billable Modal resources or call paid model APIs. Review their lifecycle and cleanup behavior before you run them.
-</Warning>
+Primary examples use one async owner, one versioned handle, one explicitly placed Function, and one
+borrow for each trajectory. Provider imports stay in application code.
 
-<CardGroup cols={2}>
-  <Card title="Use async lifecycle methods" href="https://github.com/ashtonchew/modal-computer-use/blob/main/examples/async_modal_owner.py">
-    Use native async creation and cleanup when your application runs an event loop. The owner example terminates its Sandbox, while the [named variant](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/async_named_desktop.py) attaches without taking ownership or creates a Sandbox that it owns.
-  </Card>
-  <Card title="Attach to an existing desktop" href="https://github.com/ashtonchew/modal-computer-use/blob/main/examples/attach_existing_sandbox.py">
-    Attach to a desktop that another process owns. The example detaches on exit and leaves the Sandbox running.
-  </Card>
-  <Card title="Configure and prewarm a browser" href="https://github.com/ashtonchew/modal-computer-use/blob/main/examples/browser_profile.py">
-    Create a desktop with an explicit browser profile and prewarm setting. The example creates a billable Sandbox and disables GPU use by default.
-  </Card>
-  <Card title="Capture a recording" href="https://github.com/ashtonchew/modal-computer-use/blob/main/examples/recording_lifecycle.py">
-    Capture a desktop session through an existing local daemon. The example writes an MP4 file, so your application must define storage and retention rules.
-  </Card>
-  <Card title="Persist artifacts" href="https://github.com/ashtonchew/modal-computer-use/blob/main/examples/volume_artifacts.py">
-    Persist run artifacts in a Modal Volume v2. The example terminates its Sandbox but retains the caller-owned Volume and its data.
-  </Card>
-  <Card title="Run an OpenAI computer loop" href="https://github.com/ashtonchew/modal-computer-use/blob/main/examples/03_openai_computer_loop.py">
-    Run a bounded OpenAI computer loop with batching and screenshot reuse. Your application owns action approval, credentials, provider output retention, and model cost.
-  </Card>
-  <Card title="Run an Anthropic computer loop" href="https://github.com/ashtonchew/modal-computer-use/blob/main/examples/anthropic_message_server.py">
-    Run a bounded Anthropic computer loop with a reviewed batch tool. Your application owns policy for the hosted actions and the custom batch tool.
-  </Card>
-  <Card title="Review actions before execution" href="https://github.com/ashtonchew/modal-computer-use/blob/main/examples/adapter_policy_hook.py">
-    Add an application policy before an adapter executes an action. This credential-free example uses a fake computer and does not control a desktop.
-  </Card>
-  <Card title="Hand a desktop to a Modal Function" href="https://github.com/ashtonchew/modal-computer-use/blob/main/examples/modal_function_session_handoff.py">
-    Borrow an owned desktop for one stateful Function trajectory. Cancellation does not reverse desktop effects, so the owner must reconcile an ambiguous result.
-  </Card>
-  <Card title="Keep warm capacity" href="https://github.com/ashtonchew/modal-computer-use/blob/main/examples/04_warm_pool.py">
-    Provision and claim bounded warm desktop capacity. Reserved Sandboxes can remain billable while idle, and each claim is one-shot.
-  </Card>
-</CardGroup>
+Low-level examples remain useful for local execution, REST integration, idempotency, debugging,
+and compatibility. Their callers establish and own topology explicitly.

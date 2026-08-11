@@ -1,104 +1,58 @@
 ---
-title: "Run action batches"
+title: "Run ordered action batches"
 sidebarTitle: "Action batches"
-description: "Validate and execute ordered desktop actions in one request."
+description: "Validate and run one ordered model action array without automatic replay."
 ---
 
-`computer.actions.run()` sends an ordered list to the daemon. The daemon validates the complete request before it executes the first action.
-
-## Run a batch
+## Use one step for one model action array
 
 ```python
-batch = computer.actions.run(
+step = await computer.step(
     [
         {"type": "move", "x": 320, "y": 240},
-        {"type": "click", "x": 320, "y": 240},
-        {"type": "type", "text": "hello"},
-        {"type": "keypress", "key": "ENTER"},
-    ]
-)
-
-if not batch.ok:
-    for item in batch.results:
-        if not item.ok:
-            print(item.error)
-```
-
-The daemon stops at the first failed top-level action by default. It returns an `ActionBatchResult` with `ok=False`. A failed action result does not raise an exception by itself.
-
-## Continue after a failed item
-
-```python
-batch = computer.actions.run(
-    [
-        {"type": "click", "x": 100, "y": 200},
-        {"type": "type", "text": "value"},
-        {"type": "keypress", "key": "ENTER"},
+        {"type": "click", "x": 320, "y": 240, "button": "left"},
     ],
-    continue_on_error=True,
-)
-```
-
-`continue_on_error` applies between top-level items. A compound `hold_key` action remains one atomic item.
-
-## Capture a trailing screenshot
-
-```python
-batch = computer.actions.run(
-    [{"type": "click", "x": 100, "y": 200}],
-    screenshot_after=True,
+    continue_on_error=False,
 )
 
-if batch.screenshot is not None:
-    batch.screenshot.save("after-click.png")
+actions = step.actions
+screenshot = step.screenshot
 ```
 
-The daemon captures this screenshot in the same request. It skips capture when a failed item stops the batch.
+A successful return means:
 
-Use the raw fused route when you only need image bytes:
+- the complete action tree validated before mutation;
+- actions ran once and in order;
+- native input synchronized before capture;
+- the screenshot passed the same integrity checks as `screenshots.full()`;
+- no SDK mutation interleaved between the batch and capture.
 
-```python
-result = computer.actions.run_and_screenshot_bytes(
-    [{"type": "click", "x": 100, "y": 200}]
-)
-Path("after-click.png").write_bytes(result.data)
-```
+The screenshot is immediate. Your application decides when it has finished handling the input.
 
-Add this import to the example:
+## Choose failure behavior
 
-```python
-from pathlib import Path
-```
+The default stops after the first known action failure. Set `continue_on_error=True` only when later
+actions remain safe after that failure.
 
-## Validate without execution
+Known action failures remain in `step.actions`. Validation, placement, unknown mutation outcome,
+lost observation, protocol, frame-integrity, lease, and cleanup failures raise typed exceptions.
 
-```python
-validation = computer.actions.validate(
-    [
-        {"type": "move", "x": 320, "y": 240},
-        {"type": "click", "x": 320, "y": 240},
-    ]
-)
+The SDK never replays an action after dispatch may have started. Use the operation receipt and
+explicit recovery interfaces when a response is lost.
 
-if not validation.ok:
-    print(validation.errors)
-```
+## Understand input admission
 
-## Use supported action shapes
+The daemon uses the `normalized-input-work-v1` token policy. It reserves the complete recursive
+batch cost before mutation. The portable baseline refills 100 tokens per second and allows a
+400-token burst.
 
-| Action | Main fields |
-| --- | --- |
-| `move` | `x`, `y` |
-| `click` | optional `x`, `y`, `button`, `modifiers` |
-| `double_click` | click fields |
-| `triple_click` | click fields |
-| `scroll` | `direction`, `amount`, optional `x`, `y` |
-| `drag` | start and end coordinates, or `path` |
-| `type` | `text`, optional `delay_ms`, optional `method` |
-| `keypress` | `key`, optional `modifiers`, optional `duration_ms` |
-| `hotkey` | `keys` |
-| `hold_key` | `key`, optional nested `actions` |
-| `wait` | `duration_ms` |
-| `screenshot` | optional screenshot `options` |
+A batch that exceeds the burst fails before mutation. A transient limit returns `429`,
+`retry_after_ms`, and `Retry-After`. The SDK exposes the retry delay on the sanitized error.
 
-The default batch limit is 50 actions. The daemon can use a different configured limit.
+Rate limiting protects resources. Application approval remains responsible for high-impact
+actions.
+
+## Keep low-level action-only calls explicit
+
+Use `computer.actions.run()` when the caller intentionally needs an action result without a
+trailing screenshot. Keep direct REST and idempotency routes for low-level integrations.

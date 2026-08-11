@@ -1,98 +1,65 @@
 ---
-title: "Control a Linux desktop on Modal"
+title: "Run a placed computer trajectory"
 sidebarTitle: "Home"
-description: "Create and control a Linux desktop in a Modal Sandbox with Modal Computer Use."
+description: "Create one Modal desktop and control it from one placed Modal Function."
 ---
 
-Modal Computer Use provides a typed Python SDK and an in-Sandbox daemon. You can control the mouse, keyboard, browser, files, screenshots, and recordings.
+Modal Computer Use provides a typed Python SDK and an in-Sandbox daemon. Your application owns the
+model loop. The SDK owns Modal orchestration. The daemon executes desktop primitives inside the
+Sandbox.
 
 This is an independent project that uses Modal.
 
-## Run the quickstart
+## Use the primary path
 
-You need Python 3.12 or later. You also need a Modal account with local credentials.
+The 2.x path has one owner and one borrower:
 
-Install the package with the Modal extra:
+1. An async owner creates the desktop once.
+2. The owner creates a versioned session handle.
+3. The owner sends the handle to an explicitly placed Modal Function.
+4. The Function enters one `borrow_async()` context for the trajectory.
+5. Each model action array uses one `computer.step()` call.
+6. The borrower releases its lease before the owner cleans up the desktop.
 
-```bash
-uv add "modal-computer-use[modal]"
-```
-
-Save this file as `quickstart.py`:
-
-```python
-from modal_computer_use import (
-    BrowserConfig,
-    ComputerConfig,
-    ComputerSandbox,
-    ResourceConfig,
-)
-
-config = ComputerConfig(
-    resources=ResourceConfig(profile="browser"),
-    browser=BrowserConfig(kind="chromium"),
-)
-
-with ComputerSandbox.create(config=config) as computer:
-    computer.browser.open_url("https://example.com")
-    computer.mouse.move(320, 240)
-    screenshot = computer.screenshots.full()
-    screenshot.save("screenshot.png")
-    print(screenshot.width, screenshot.height, screenshot.sha256)
-```
-
-Run the file:
-
-```bash
-uv run python quickstart.py
-```
-
-The SDK terminates the Sandbox when the `with` block ends. It also closes the daemon connection.
+`computer.step()` validates and runs one ordered action array. It returns the action result and one
+immediate post-action screenshot. Your application defines readiness and task success.
 
 <CardGroup cols={2}>
   <Card title="Install" href="/start/installation">
-    Install the package and set up Modal credentials.
+    Install version 2 and set up Modal credentials.
   </Card>
-  <Card title="Choose an example" href="/start/examples">
-    Find a maintained pattern for your use case and lifecycle.
+  <Card title="Run the quickstart" href="/start/quickstart">
+    Deploy one Function and run one borrowed trajectory.
   </Card>
-  <Card title="Create or attach" href="/build/create-and-attach">
-    Choose the lifecycle that matches your application.
+  <Card title="Integrate OpenAI" href="/integrate/openai">
+    Keep the Responses API loop in your application.
   </Card>
-  <Card title="Automate a browser" href="/build/browser-automation">
-    Configure Chromium or Firefox and open a page.
+  <Card title="Integrate Anthropic" href="/integrate/anthropic">
+    Keep the Messages API loop in your application.
   </Card>
-  <Card title="Run action batches" href="/build/action-batches">
-    Send ordered desktop actions in one request.
+  <Card title="Configure cost" href="/operate/configure">
+    Select region, resources, image, and capacity explicitly.
   </Card>
-  <Card title="Capture output" href="/build/screenshots-recordings">
-    Save screenshots and record the desktop.
-  </Card>
-  <Card title="Persist artifacts" href="/build/artifacts-storage">
-    Store files in a Sandbox or a Modal Volume.
+  <Card title="Read the migration guide" href="/reference/overview">
+    Move a 1.x primitive loop to the placed 2.x path.
   </Card>
 </CardGroup>
 
-## How the parts connect
+## Choose the right surface
 
-```mermaid
-flowchart LR
-    A["Your Python application"] --> B["Modal Computer Use SDK"]
-    B --> C["Modal Sandbox"]
-    C --> D["Computer-use daemon"]
-    D --> E["Linux desktop"]
-```
-
-Your application owns the task and any model loop. The SDK owns Modal orchestration. The daemon executes desktop primitives inside the Sandbox.
-
-## Choose an API surface
-
-| Need | API |
+| Need | Interface |
 | --- | --- |
-| Create a desktop from synchronous Python | `ComputerSandbox.create()` |
-| Create a desktop from async Python | `AsyncComputerSandbox.create()` |
-| Attach to an existing Modal Sandbox | `ComputerSandbox.attach()` |
-| Connect to an existing daemon | `DaemonClient` or `AsyncDaemonClient` |
-| Borrow a desktop in a deployed Modal Function | `ComputerSessionHandle.borrow_async()` |
+| Repeated model turns | One placed Function, one borrow, and `computer.step()` |
+| Initial or screenshot-only observation | `computer.screenshots.full()` |
+| Local daemon work | `DaemonClient.local()` or `AsyncDaemonClient.local()` |
+| Direct REST or debugging | The retained daemon routes and OpenAPI schema |
+| Compatibility without handoff | Explicit low-level create, attach, and direct-client paths |
 
-Use the [Python API guide](https://github.com/ashtonchew/modal-computer-use/blob/main/docs/api.md) for the complete contract. Use the [OpenAPI schema](https://github.com/ashtonchew/modal-computer-use/blob/main/docs/openapi.json) for HTTP request and response models.
+Low-level paths remain supported for callers that establish and own their topology explicitly.
+
+## Understand the latency evidence
+
+The article's 47.10 ms value adds separate 37.25 ms screenshot and 9.85 ms click medians. A later
+fixed-topology benchmark measured the fused `computer.step()` path at 44.29 ms p50 and 52.57 ms
+p95. Read the [current benchmark results](/benchmarks/current-results) for both measurement scopes
+and source revisions.

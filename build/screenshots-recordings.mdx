@@ -1,82 +1,74 @@
 ---
 title: "Capture screenshots and recordings"
 sidebarTitle: "Screenshots and recordings"
-description: "Capture desktop images and record an MP4 file."
+description: "Capture semantic screenshots, choose a source, and record the desktop."
 ---
 
-## Capture a full screenshot
+## Capture the initial frame
 
 ```python
-screenshot = computer.screenshots.full(
+screenshot = await computer.screenshots.full(
     format="png",
-    show_cursor=True,
+    show_cursor=False,
 )
-screenshot.save("desktop.png")
+
+data = screenshot.as_bytes()
 print(screenshot.width, screenshot.height, screenshot.sha256)
 ```
 
-The default storage mode is `inline`. The returned `Screenshot` can contain raw bytes, base64 data, or an artifact URI. Use `screenshot.as_bytes()` when the payload is inline.
+Inline `screenshots.full()` uses the raw binary HTTP route through the borrowed pooled client. It
+still returns a semantic `Screenshot`. The SDK validates the body, format, dimensions, size,
+digest, timestamp, coordinate space, cursor state, timing, and capture backend.
 
-## Capture a region
+Use `full_bytes()` when a low-level caller only needs encoded bytes. JSON and base64 routes remain
+available for REST and compatibility clients. Artifact storage keeps its structured response.
 
-```python
-region = computer.screenshots.region(
-    x=100,
-    y=80,
-    width=640,
-    height=480,
-    format="png",
-)
-region.save("region.png")
-```
-
-Use `full_bytes()` or `region_bytes()` when you only need encoded image bytes:
+## Use the step frame after actions
 
 ```python
-from pathlib import Path
-
-data = computer.screenshots.full_bytes(format="png")
-Path("desktop.png").write_bytes(data)
+step = await computer.step(actions)
+screenshot = step.screenshot
 ```
 
-## Store a screenshot as an artifact
+The frame follows native input synchronization. Your application owns readiness. The experimental
+first-visual-change interface has a separate polling and XDamage contract.
+
+## Select a screenshot source
+
+MSS is the production default.
 
 ```python
-screenshot = computer.screenshots.full(
-    format="png",
-    storage="artifact",
-)
-print(screenshot.width, screenshot.height, screenshot.size_bytes)
+from modal_computer_use import ComputerConfig
+
+config = ComputerConfig(actions={"screenshot_capture_source": "x11-shm"})
 ```
 
-Artifact storage changes daemon state. Keep artifact URIs out of logs because they can reveal run details.
+| Source | Behavior |
+| --- | --- |
+| `mss` | Uses the persistent MSS session. This is the default. |
+| `auto` | Probes X11-SHM after readiness and may use MSS after an ordinary native failure. |
+| `x11-shm` | Requires X11-SHM readiness and fails closed when the source is unavailable. |
+
+X11-SHM requires a managed Image containing the native extension and worker. It applies to eligible
+cursor-hidden, full-resolution PNG requests at scale 1. Other formats and cursor-visible requests
+use the compatibility path.
+
+An X-server reply timeout fails closed. Every screenshot source depends on that display, so a
+fallback cannot prove safe capture while the display is unresponsive. A display restart clears
+generation-bound clients before the daemon proves readiness again.
+
+The fixed promotion campaign rejected X11-SHM as the default. Keep it as an explicit opt-in until
+a new campaign passes every latency and reliability gate.
 
 ## Record the desktop
 
 ```python
-from pathlib import Path
-
-recording = computer.recordings.start(name="demo", fps=12)
+recording = await computer.recordings.start(name="demo", fps=12)
 try:
-    computer.mouse.move(50, 50)
+    await computer.actions.run([{"type": "move", "x": 50, "y": 50}])
 finally:
-    stopped = computer.recordings.stop(recording.id)
-
-path = computer.recordings.download(
-    stopped.id,
-    Path("artifacts/demo-recording.mp4"),
-)
-print(stopped.status, stopped.size_bytes, path.exists())
+    stopped = await computer.recordings.stop(recording.id)
 ```
 
-Always stop a recording before you terminate its Sandbox. This lets `ffmpeg` finish the file.
-
-## Inspect and remove recordings
-
-```python
-recordings = computer.recordings.list()
-selected = computer.recordings.get(recording.id)
-computer.recordings.delete(selected.id)
-```
-
-Recording methods use the recording `id`. A recording `name` is optional metadata and is not a route identifier.
+Stop a recording before the owner terminates the Sandbox. Keep screenshot bytes, recordings, and
+artifact references out of logs.

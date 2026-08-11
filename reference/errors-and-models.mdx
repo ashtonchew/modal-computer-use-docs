@@ -1,100 +1,80 @@
 ---
 sidebarTitle: "Errors and models"
 title: "Errors and models"
-description: "Review stable v1.1.0 result models and top-level error types."
+description: "Review stable 2.0 result models and recovery errors."
 ---
 
-The SDK returns Pydantic models for structured results. It raises typed exceptions for configuration, lifecycle, and session handoff failures.
+The SDK returns Pydantic models and raises typed exceptions for configuration, lifecycle, placement, transport, and recovery failures.
 
 ## Common result models
 
 | Model | Use |
 | --- | --- |
-| `ActionResult` | Result of one primitive action or command |
-| `ActionBatchResult` | Ordered results and batch timing |
-| `ActionBatchTiming` | Daemon elapsed time for a batch |
-| `ActionItemResult` | Result for one batch item |
-| `Screenshot` | Image bytes, dimensions, format, and digest |
-| `ScreenshotOptions` | Screenshot capture and processing options |
-| `Point` and `Region` | Coordinates and rectangular regions |
-| `DisplayInfo` and `DisplayGeometry` | Display metadata and coordinate geometry |
-| `X11Window` | Window identity, title, bounds, and state |
-| `Recording` | Recording state, path, duration, size, and digest |
-| `ArtifactInfo` | Artifact path, size, and metadata |
-| `ArtifactSyncResult` | Persistence sync outcome |
-| `ProcessStatus` | Supervised process state |
-| `ComputerStatus` | Desktop lifecycle and budget state |
-| `SandboxRef` | Sanitized Sandbox and session metadata |
-| `SandboxCleanupResult` | Cleanup candidates, skips, and errors |
-| `ComputerSessionHandle` | Versioned routing identity for session handoff |
-| `SessionRecoveryStatus` | Owner-visible recovery state |
+| `ComputerStepResult` | Ordered actions, immediate screenshot, and Step timing |
+| `ComputerStepTiming` | Daemon, action, screenshot, and total timing |
+| `ActionResult` | One primitive action or command result |
+| `ActionBatchResult` | Ordered item results and batch timing |
+| `Screenshot` | Image bytes, dimensions, format, digest, capture metadata, and optional cursor position |
+| `ScreenshotOptions` | Capture format, cursor, scale, processing, and storage options |
+| `ComputerSessionHandle` | Versioned routing identity for placed handoff |
+| `SessionRecoveryStatus` | Owner-visible receipt and recovery state |
 | `SessionRecoveryAcknowledgement` | Explicit owner recovery result |
+| `SandboxCleanupResult` | Cleanup candidates, skips, and errors |
+| `ArtifactInfo` and `ArtifactSyncResult` | Artifact metadata and persistence outcome |
 
-Import these models from `modal_computer_use`.
+Import public models from `modal_computer_use`.
 
 ```python
-from modal_computer_use import ActionBatchResult, Screenshot
+from modal_computer_use import ComputerStepResult, Screenshot
 ```
 
-See the [v1.1.0 model source](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/src/modal_computer_use/models.py) for complete fields.
+See the [2.0 model source](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/src/modal_computer_use/models.py) and [Step models](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/src/modal_computer_use/steps/models.py) for complete fields.
 
-## Top-level error types
-
-The v1.1.0 package exports these errors at `modal_computer_use`:
+## Placement and handoff errors
 
 | Error | Meaning |
 | --- | --- |
-| `ConfigConflictError` | An existing Sandbox does not match the requested configuration. |
-| `BrowserReadinessError` | The configured browser did not reach the required ready state. |
-| `FrameValidationError` | A frame is empty, invalid, or incompatible. |
-| `SandboxUnavailableError` | A Sandbox cannot be found or contacted. |
-| `SandboxAmbiguousError` | An attach query matches more than one Sandbox. |
-| `SessionBorrowError` | Base class for safe session-borrow failures. |
-| `SessionCompatibilityError` | The session does not support the requested handoff protocol. |
-| `SessionEnvironmentMismatchError` | The runtime environment does not match session policy. |
-| `SessionPlacementMismatchError` | Function placement does not match session policy. |
-| `SessionTargetMismatchError` | The live target does not match the handle. |
-| `SessionBusyError` | Another run owns the session lease. |
-| `SessionLeaseLostError` | The borrower no longer owns the lease. |
-| `RunSequenceConflictError` | An operation sequence conflicts with session state. |
-| `ActionOutcomeUnknownError` | An action may have run, but its outcome is unknown. |
-| `OperationResultUnavailableError` | An operation completed, but its retained result is unavailable. |
-| `OperationNotAppliedError` | Receipt resolution proves that the operation did not run. |
-| `SessionRecoveryRequiredError` | The owner must complete explicit recovery. |
+| `SessionPlacementMissingError` | A required exact placement value is absent |
+| `SessionPlacementMalformedError` | A placement value has an invalid form |
+| `SessionPlacementUnverifiableError` | The SDK cannot prove the required placement |
+| `SessionPlacementMismatchError` | Function and desktop placement differ |
+| `SessionEnvironmentMismatchError` | The Function and desktop use different Modal environments |
+| `SessionTargetMismatchError` | The live target does not match the handle |
+| `SessionCompatibilityError` | Version or capability checks reject the daemon |
+| `SessionBusyError` | Another run owns the lease |
+| `SessionLeaseLostError` | The borrower no longer owns the lease |
 
-## Do not replay unknown mutations
+These checks fail before desktop mutation.
 
-Treat `ActionOutcomeUnknownError` as an indeterminate mutation. Do not replay the action through another route.
+## Mutation and recovery errors
 
-`OperationResultUnavailableError` exposes a nonnegative `sequence` and an allowlisted `operation_kind` when the daemon supplied one. A borrowed client can call `observe_after_result_loss()` to capture one later full-screen PNG. That observation does not prove semantic success. It does not unblock later mutations in the same borrow.
+| Error | Meaning |
+| --- | --- |
+| `RunSequenceConflictError` | An operation sequence conflicts with session state |
+| `ActionOutcomeUnknownError` | The operation may have mutated the desktop |
+| `OperationResultUnavailableError` | The operation completed, but its retained result is unavailable |
+| `OperationNotAppliedError` | Receipt resolution proves that the operation did not run |
+| `SessionRecoveryRequiredError` | The owner must complete explicit recovery |
+
+Never replay an operation after possible dispatch. When a receipt proves completion but the result is unavailable, capture one later frame for diagnosis:
 
 ```python
 from modal_computer_use import OperationResultUnavailableError
 
 try:
-    await computer.actions.run(actions)
+    step = await computer.step(actions)
 except OperationResultUnavailableError as exc:
     frame = await computer.observe_after_result_loss()
     record_sequence(exc.sequence, exc.operation_kind, frame.sha256)
 ```
 
-## Daemon errors
+The later frame supports diagnosis. Task success and later mutation recovery remain explicit owner
+decisions.
 
-Direct primitive failures use this JSON shape:
+## Rate-limit errors
 
-```json
-{
-  "code": "input_backend_unavailable",
-  "message": "Input backend is unavailable",
-  "details": {
-    "retry_safe": true,
-    "emission_state": "not_started"
-  }
-}
-```
+The daemon returns HTTP 429 when the weighted token bucket lacks capacity. `DaemonHTTPError.retry_after_ms` and its allowlisted `Retry-After` header report when capacity should be available. Rate rejection happens before mutation.
 
-Batch item failures use the same stable code as `error_code`. They place structured details in `output`.
+## Protect failure data
 
-`retry_safe` describes duplicate-execution safety. It does not mean that automatic retry will succeed.
-
-See the [v1.1.0 error source](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/src/modal_computer_use/errors.py) for module-level transport, validation, budget, artifact, and optional-dependency errors.
+Errors and logs must not contain bearer tokens, tunnel URLs, clipboard text, typed text, screenshots, artifact bytes, or provider credentials.

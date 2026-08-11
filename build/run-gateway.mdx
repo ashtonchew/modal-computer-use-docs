@@ -1,0 +1,58 @@
+---
+title: "Build an application run gateway"
+sidebarTitle: "Run gateway"
+description: "Expose a bounded spawn-and-poll control plane from your application."
+---
+
+The run gateway is an application pattern. Your application owns authentication, authorization,
+storage, task policy, and the model loop.
+
+## Admit one run
+
+Use opaque desktop and task keys plus a required idempotency key. One durable transaction handles
+replay, quota, exclusive desktop ownership, run creation, and a payload-free dispatch intent.
+
+A matching replay returns the existing run. A mismatched replay, desktop contention, or exhausted
+quota returns a sanitized error without writes.
+
+The second atomic claim selects one dispatcher. A stale claim becomes `indeterminate`. The gateway
+never spawns it automatically.
+
+## Dispatch and reconcile
+
+The dispatcher sends `(handle, task, run_id, deadline_at)` to the placed trajectory Function.
+Modal dispatch and durable persistence do not form one transaction. A stable run ID fences a
+repeated borrow, but it cannot recover a missing FunctionCall identity.
+
+`GET /v1/runs/{run_id}` reads durable state. A scheduled reconciler polls Modal and requests
+cancellation. Each write requires the lease token and expected record version.
+
+Missing call identity, provider ambiguity, the error cap, or the cancellation deadline seals the
+run as `indeterminate`. The run keeps its quota and desktop claim until an audited recovery.
+
+## Recover and retain records
+
+`SAFE_RELEASE` and `SAFE_REPLACE` require a sealed record, its expected version, and non-empty audit
+fields. Replacement creates a successor with new run and idempotency identities. It never reopens
+the ambiguous run.
+
+Retain active, leased, cancellation, unresolved-audit, and indeterminate records. Keep replay
+tombstones through their fencing window.
+
+For HMAC rotation, add the new key before you retire an older key. Remove an older key only after
+no row or tombstone references it.
+
+## Verify cleanup
+
+Poll every dispatched Function call to a terminal state. Release the borrowed lease before the
+owner terminates the desktop. Record cleanup failures and reconcile tagged Modal resources until
+the survivor count reaches zero.
+
+## Keep the security boundary clear
+
+Authenticate the caller and authorize the target before invoking the Function. Keep session
+handles, provider call identities, task text, results, endpoints, and tokens private.
+
+The maintained example supplies the state contract and in-memory test seam. Add your production
+database adapter, migration worker, and authenticated admin route. Read the [source reference](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/reference/run-gateway.md)
+before you adapt it.

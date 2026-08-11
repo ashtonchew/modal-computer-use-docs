@@ -1,126 +1,74 @@
 ---
 title: "Run an Anthropic computer loop"
 sidebarTitle: "Anthropic"
-description: "Connect the Anthropic Messages API computer tool to a Modal desktop."
+description: "Connect the Anthropic Messages API computer tool to a placed Modal desktop."
 ---
 
-`AnthropicAdapter` converts Anthropic computer actions to native desktop actions. It does not call the Anthropic API. Your application owns the model client, message history, policy, and limits.
+Your application owns the Anthropic client, message history, limits, and approval policy. `AnthropicAdapter` only converts provider actions to SDK actions.
 
 ## Install the provider extra
 
 ```bash
-uv add "modal-computer-use[modal,anthropic]"
+uv add "modal-computer-use[modal,anthropic]==2.0.0"
 ```
 
-Set `ANTHROPIC_API_KEY` in the application environment. Do not add the key to the Sandbox image.
+Store `ANTHROPIC_API_KEY` in the placed Function. Keep it out of the desktop Sandbox.
 
-## Select a tool version
-
-Use matching tool and beta versions.
+## Select matching tool versions
 
 | Tool | Beta header | Use |
 | --- | --- | --- |
-| `computer_20251124` | `computer-use-2025-11-24` | New integrations and optional zoom. |
-| `computer_20250124` | `computer-use-2025-01-24` | Compatible older integrations. |
-| `computer_20241022` | `computer-use-2024-10-22` | Adapter compatibility only. |
+| `computer_20251124` | `computer-use-2025-11-24` | Current integration with optional zoom |
+| `computer_20250124` | `computer-use-2025-01-24` | Compatible older integration |
+| `computer_20241022` | `computer-use-2024-10-22` | Adapter compatibility |
 
-The adapter defaults to `computer_20251124`. Set `enable_zoom=True` to enable zoom for that version.
+The adapter defaults to `computer_20251124`. Set `enable_zoom=True` when you want zoom with that version.
 
-## Declare the hosted tool
+## Keep the loop inside the placed Function
 
-Anthropic owns the hosted `computer` tool schema. Do not add an input schema to it.
+Follow the [session handoff](/build/session-handoff) guide. Borrow once around the complete Messages API loop.
 
 ```python
-response = client.beta.messages.create(
-    model="claude-sonnet-5",
-    betas=["computer-use-2025-11-24"],
-    max_tokens=4096,
-    tools=[
-        {
-            "type": "computer_20251124",
-            "name": "computer",
-            "display_width_px": 1280,
-            "display_height_px": 800,
-            "enable_zoom": True,
-        }
-    ],
-    messages=messages,
+async with handle.borrow_async(
+    run_id=run_id,
+    function_region=REGION,
+) as computer:
+    response = await run_anthropic_computer_loop(
+        client=anthropic_client,
+        computer=computer,
+        task=task,
+        display_width_px=1280,
+        display_height_px=800,
+    )
+```
+
+Keep the complete assistant content in message history. Continue only when `stop_reason` is `tool_use`. Return all matching tool results in the next user message.
+
+## Preserve hosted-tool order
+
+Execute hosted computer calls in response order. Use `computer.step()` for actions that need an immediate screenshot.
+
+```python
+step = await computer.step(
+    [normalized_action],
+    continue_on_error=False,
+    call_id=tool_use.id,
 )
 ```
 
-Keep the complete assistant content in message history. Continue only when `stop_reason` is `tool_use`. Return all matching tool results together in the next user message.
+Keep these provider semantics:
 
-## Execute actions in order
+- Return cursor coordinates as text for `cursor_position`.
+- Reuse the native image from `screenshot` or `zoom` when present.
+- Avoid a duplicate trailing image after a native image action.
+- Keep separate hosted calls separate.
 
-Create the adapter once for the complete loop:
-
-```python
-from modal_computer_use.adapters.anthropic import (
-    AnthropicAdapter,
-    anthropic_tool_result,
-)
-
-adapter = AnthropicAdapter(
-    computer,
-    tool_version="computer_20251124",
-    enable_zoom=True,
-)
-```
-
-Execute hosted tool calls in response order. Do not combine separate hosted calls into one batch.
-
-```python
-from modal_computer_use import Screenshot
-
-action = tool_use.input
-result = adapter.apply(action)
-
-if action["action"] in {"screenshot", "zoom"}:
-    observation = Screenshot.model_validate(result.output)
-elif action["action"] == "cursor_position":
-    observation = result
-else:
-    observation = computer.screenshots.full()
-
-tool_result = anthropic_tool_result(
-    tool_use_id=tool_use.id,
-    result=observation,
-)
-```
-
-Reuse a screenshot returned by `screenshot` or `zoom`. Return cursor coordinates as text. Capture one screenshot after another successful hosted action.
-
-## Use a batch tool only for fixed sequences
-
-Your application can define a custom `computer_batch` tool. Use it only when every action can run without an intermediate model decision.
-
-All batch coordinates refer to the screenshot from before the batch. Execute actions sequentially. Stop on the first error.
-
-Use the hosted `computer` tool for these cases:
-
-- Exploratory navigation.
-- Sensitive steps.
-- Recovery after a failure.
-- A step that depends on an intermediate screen.
-
-## Supported actions
-
-All versions support mouse movement, clicks, drag, key input, typing, screenshots, and cursor position.
-
-The 2025 versions also support scroll, mouse down and up, held keys, wait, and triple click. The `computer_20251124` version supports zoom when you enable it.
-
-The adapter rejects an action that the selected version does not support.
-
-## Bound the loop
-
-Set limits for turns, trajectory actions, batch actions, action time, and elapsed time. Stop before you act when the final allowed turn requests another tool call.
-
-Pass `CoordinateSpace` when the provider image size differs from the desktop size. The adapter then maps provider coordinates before execution.
-
-<Warning>
-Treat the task, page content, screenshots, provider output, typed text, and clipboard text as untrusted data. Require confirmation before an action creates an external effect. Anthropic's hosted safety checks do not cover an application-owned batch tool.
-</Warning>
+Use a custom batch tool only for a fixed sequence that needs no intermediate model decision. Send its ordered actions in one `computer.step()` call.
 
 ## Use the maintained example
 
-Use the [Anthropic loop example](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/anthropic_message_server.py) when your application needs a batch tool between model turns. It includes the reviewed schemas, message loop, limits, result handling, and cleanup. Your application still owns policy for hosted actions, the custom batch tool, provider output retention, and model cost.
+The [Anthropic loop example](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/examples/anthropic_message_server.py) contains reviewed schemas, the placed Function, provider ordering, batch handling, limits, result conversion, cancellation, and cleanup.
+
+<Warning>
+Treat tasks, page content, screenshots, provider output, typed text, and clipboard text as untrusted. Ask for approval before an action creates an external effect. Anthropic safety checks do not cover an application-owned batch tool.
+</Warning>
