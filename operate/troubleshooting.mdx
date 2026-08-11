@@ -15,7 +15,7 @@ Use `computer.processes.logs("xvfb")` when Xvfb fails. Confirm that `DISPLAY` ma
 If the error names placement, compare the exact requested Function region, observed Function
 region, and target region. Use an exact selector such as `us-west-2` for the placed path.
 
-If the error names `computer-step-envelope-v1`, install a daemon that supports the 2.x step
+If the error names `computer-step-envelope-v1`, install a daemon that supports the Step
 protocol. Keep the failed operation stopped until the compatibility check passes.
 
 ## A screenshot is black or empty
@@ -87,12 +87,6 @@ moves browser startup into desktop startup. Page network, authentication, and re
 in the first navigation.
 
 For GPU tests, read `/v1/browser/status`. A Modal GPU allocation alone does not prove hardware browser rendering.
-
-## The observed step latency differs from 47.10 ms
-
-The article added separate 37.25 ms screenshot and 9.85 ms click medians. The dated Computer Step
-benchmark measured the fused path at 44.29 ms p50 and 52.57 ms p95 in its fixed topology. Results
-for another region, Image, resource shape, or workload require a new measurement.
 
 ## A warm-pool candidate expired
 

@@ -1,7 +1,7 @@
 ---
 sidebarTitle: "Current results"
 title: "Current benchmark results"
-description: "Review the dated results used for the 2.0 release decision."
+description: "Review current dated benchmark results and their measurement boundaries."
 ---
 
 These reports use separate experiments and scopes. Compare values only within the matched arms described by each report.
@@ -18,6 +18,11 @@ The 8 August 2026 promotion run measured one ordered action batch and its immedi
 The run retained 100 interleaved pairs per arm. It recorded zero failures, retries, replacements, and cleanup survivors. The source was [`f6b9adeee54f584c345c813750758b7c7b5db744`](https://github.com/ashtonchew/modal-computer-use/blob/f6b9adeee54f584c345c813750758b7c7b5db744/docs/benchmark-results-2026-08-08-computer-step.md).
 
 The Step frame is immediate. Changed pixels and application readiness use separate timers.
+
+<Note>
+The article's 47.10 ms figure combined separate screenshot and click medians. The table above is the
+later measurement of the complete Step operation.
+</Note>
 
 ## Raw binary screenshot default
 
@@ -56,16 +61,6 @@ The managed standard Image completed 60 of 60 measured lifecycles with successfu
 The paired mean confidence interval crossed zero because both arms had large tail outliers. The
 result supports an opt-in managed standard Image. A universal default needs separate availability,
 rollback, and variant evidence. See the [image lifecycle report](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmark-results-2026-08-08-image-lifecycle.md).
-
-## Historical 47.10 ms figure
-
-The article combined separate medians:
-
-- Raw screenshot: 37.25 ms
-- Click: 9.85 ms
-- Arithmetic sum: 47.10 ms
-
-No fused request produced that historical value. The later Computer Step experiment measured a fused action-to-immediate-frame p50 of 44.29 ms. Keep the dates and scopes with both figures.
 
 ## Historical provider comparison
 
