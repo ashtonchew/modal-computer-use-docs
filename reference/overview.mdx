@@ -1,52 +1,34 @@
 ---
 sidebarTitle: "Overview"
 title: "API reference overview"
-description: "Choose the modal-computer-use v1.1.0 Python SDK or daemon API surface."
+description: "Choose the modal-computer-use 2.0 Python SDK or daemon API surface."
 ---
 
-Version 1.1.0 provides a typed Python SDK over the daemon HTTP API. Choose an entry point based on who owns the desktop lifecycle.
+Version 2.0 provides a typed Python SDK over the daemon HTTP API. Choose the entry point that matches lifecycle ownership.
 
 ## Choose an entry point
 
-| Need | Entry point | Lifecycle behavior |
+| Need | Entry point | Ownership |
 | --- | --- | --- |
-| Create or attach to a Modal desktop from synchronous Python | `ComputerSandbox` | Created desktops are owned. Attached desktops are not. |
-| Create or attach without blocking an event loop | `AsyncComputerSandbox` | Async contexts apply the same ownership rules. |
-| Connect to an existing daemon | `DaemonClient` or `AsyncDaemonClient` | Closing the client closes connections only. |
-| Borrow an owned desktop inside a deployed Modal Function | `ComputerSessionHandle.borrow_async()` | The original owner keeps the Sandbox. |
-| Manage several Modal desktops | `ComputerSandboxManager` | Lifecycle actions remain explicit. |
+| Run the optimized placed trajectory | `AsyncComputerSandbox.create()` and `ComputerSessionHandle.borrow_async()` | The async owner keeps the Sandbox. The placed Function borrows it. |
+| Use an explicit unplaced compatibility path | `AsyncComputerSandbox.create_unplaced()` | The caller owns the Sandbox and topology. |
+| Use synchronous Modal primitives | `ComputerSandbox` | Created desktops are owned. Attached desktops are not. |
+| Connect to an existing daemon | `DaemonClient` or `AsyncDaemonClient` | Closing the client closes its connections. |
+| Manage several desktops | `ComputerSandboxManager` | Lifecycle actions remain explicit. |
 
-```python
-from modal_computer_use import ComputerConfig, ComputerSandbox
-
-with ComputerSandbox.create(config=ComputerConfig()) as computer:
-    computer.mouse.move(100, 120)
-    screenshot = computer.screenshots.full()
-```
-
-Use the async surface when your application already uses `asyncio`:
-
-```python
-from modal_computer_use import AsyncComputerSandbox, ComputerConfig
-
-async with AsyncComputerSandbox.create(config=ComputerConfig()) as computer:
-    await computer.mouse.move(100, 120)
-    screenshot = await computer.screenshots.full()
-```
-
-The sync and async entry points expose parallel namespace methods. Async methods add `await` but keep the same operation names and result models.
+The sync and async borrowed clients both expose `computer.step(actions)`. The async path is the primary model-loop surface.
 
 ## Reference map
 
 <CardGroup cols={2}>
   <Card title="Configuration" href="/reference/configuration" icon="sliders">
-    Review public SDK models, defaults, and environment ownership.
+    Review public models, defaults, and environment ownership.
   </Card>
   <Card title="Namespaces" href="/reference/namespaces" icon="table-list">
-    Find each desktop operation by namespace.
+    Find desktop operations and the stable Step method.
   </Card>
   <Card title="Errors and models" href="/reference/errors-and-models" icon="shapes">
-    Identify stable result models and failure types.
+    Identify result models and recovery failures.
   </Card>
   <Card title="OpenAPI" href="/reference/openapi" icon="brackets-curly">
     Inspect the checked-in daemon schema and route groups.
@@ -55,23 +37,22 @@ The sync and async entry points expose parallel namespace methods. Async methods
 
 ## Import boundary
 
-Import stable top-level SDK types from `modal_computer_use`.
+Import stable SDK types from `modal_computer_use`.
 
 ```python
 from modal_computer_use import (
-    AsyncDaemonClient,
+    AsyncComputerSandbox,
     ComputerConfig,
-    ComputerSandbox,
+    ComputerStepResult,
     Screenshot,
 )
 ```
 
-Core imports do not require Modal, OpenAI, Anthropic, or provider credentials. Install the `modal` extra before you enter a Modal provisioning or attachment context.
+Core imports stay provider-free. Install only the Modal, OpenAI, or Anthropic extras your
+application uses.
 
 ## Daemon boundary
 
-The daemon exposes health, readiness, version, capability, and `/v1/*` primitive routes. The Python clients own connection pooling and typed serialization. They do not add a provider-owned model loop.
+The daemon owns desktop primitives, native input, capture, batching, receipts, and cleanup. The application owns model calls and provider state. Modal orchestration stays in the SDK owner and handoff surfaces.
 
-Use [OpenAPI](/reference/openapi) when you need the HTTP contract. Use [Namespaces](/reference/namespaces) when you write Python.
-
-The [v1.1.0 API guide](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/api.md) records lifecycle, handoff, action, and provider-adapter contracts.
+Use [OpenAPI](/reference/openapi) for the HTTP contract. Use [Namespaces](/reference/namespaces) for Python methods. The [application API guide](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/api.md) records the complete lifecycle and recovery contract.

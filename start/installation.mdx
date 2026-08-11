@@ -1,66 +1,49 @@
 ---
-title: "Install Modal Computer Use"
+title: "Install Modal Computer Use 2.x"
 sidebarTitle: "Installation"
-description: "Install modal-computer-use and set up Modal credentials."
+description: "Install modal-computer-use 2.x and set up Modal credentials."
 ---
 
-## Requirements
-
-You need Python 3.12 or later. The Modal integration supports the Modal 1.5 line and requires Modal 1.5.2 or later.
+You need Python 3.12 or later and Modal 1.5.3 or later.
 
 ## Install the package
 
-Install the package with `uv`:
-
 ```bash
-uv add "modal-computer-use[modal]"
+uv add "modal-computer-use[modal]==2.0.0"
 ```
 
-The `modal` extra installs the supported Modal SDK. The base package does not import Modal until you use a Modal lifecycle operation.
-
-Use `pip` if your project does not use `uv`:
+Use `pip` when your project does not use `uv`:
 
 ```bash
-python -m pip install "modal-computer-use[modal]"
+python -m pip install "modal-computer-use[modal]==2.0.0"
 ```
+
+The base package loads Modal lazily when a lifecycle operation needs it.
 
 ## Set up Modal credentials
 
-Run the Modal setup command:
-
 ```bash
 uv run modal setup
-```
-
-Complete the browser flow that Modal opens. Then confirm that the CLI can access your Modal environment:
-
-```bash
 uv run modal environment list
 ```
 
-Do not store Modal credentials in source files. Do not commit credential files.
+Keep Modal credentials out of source files and shell transcripts.
 
-## Choose optional extras
+## Choose optional provider extras
 
-| Extra | Install command | Use |
-| --- | --- | --- |
-| Modal | `uv add "modal-computer-use[modal]"` | Create and attach to Modal Sandboxes |
-| OpenAI | `uv add "modal-computer-use[openai]"` | Run an application-owned OpenAI model loop |
-| Anthropic | `uv add "modal-computer-use[anthropic]"` | Run an application-owned Anthropic model loop |
+| Provider | Command |
+| --- | --- |
+| OpenAI | `uv add "modal-computer-use[modal,openai]==2.0.0"` |
+| Anthropic | `uv add "modal-computer-use[modal,anthropic]==2.0.0"` |
 
-You can combine extras in one install:
-
-```bash
-uv add "modal-computer-use[modal,openai]"
-```
-
-The provider adapters do not call model APIs. Your application owns provider credentials, model calls, and confirmation policy.
+The provider adapters translate actions and results. Your application owns provider credentials,
+model calls, conversation state, and approval policy.
 
 ## Verify the install
 
 ```bash
-uv run python -c "import modal_computer_use; print(modal_computer_use.__version__)"
+uv run python -c "import modal_computer_use; assert modal_computer_use.__version__ == '2.0.0'"
 uv run computer-use --help
 ```
 
-Continue with the [quickstart](/start/quickstart).
+Version 1.1.0 remains available under the `1.x` selector.

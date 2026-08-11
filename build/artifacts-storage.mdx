@@ -90,7 +90,7 @@ finally:
         computer.detach()
 ```
 
-The sync contract supports Modal Volume v2. Modal Volume v1 is not a supported immediate-sync target for this package.
+The immediate-sync contract requires Modal Volume v2.
 
 An existing reader must reload its Volume view after the writer commits. Avoid concurrent writes to one path because Volume conflict resolution uses the last writer.
 

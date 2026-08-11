@@ -1,0 +1,71 @@
+---
+title: "Secure a desktop deployment"
+sidebarTitle: "Security"
+description: "Protect daemon access, noVNC, provider loops, logs, and retained artifacts."
+---
+
+<Warning>
+The daemon has full desktop control. It can click, type, read clipboard text, launch applications, and read or write artifacts. Do not expose its control routes as an unauthenticated public service.
+</Warning>
+
+## Require authentication
+
+Use the default attested tunnel for SDK-created Sandboxes. It uses an SDK-managed bootstrap bearer to mint short-lived session tokens.
+
+Use Connect ingress when your policy requires all daemon traffic to use Modal Connect. Raw and attested tunnel modes do not trust a client-supplied verified-user header.
+
+For local development, set `COMPUTER_USE_LOCAL_TOKEN`. Send it in the `Authorization` header. Do not put a token in a URL query.
+
+The daemon fails closed when it has no authenticator. `COMPUTER_USE_ALLOW_UNAUTHENTICATED_LOOPBACK=true` is a local-only escape hatch. It cannot bind to a non-loopback address.
+
+A minted session token still grants full computer use. Give it only to a party that may control that Sandbox.
+
+## Keep noVNC off by default
+
+Use `expose_vnc="off"` unless an operator needs live access.
+
+Use `"view_only"` to watch the desktop. Use `"control"` to watch and send input.
+
+Boolean `True` maps to `"control"`. It does not map to view-only.
+
+<Warning>
+A noVNC URL grants live desktop access. Treat the URL and password as secrets. Do not paste them into chat, tickets, logs, or documentation.
+</Warning>
+
+Use the [view-only example](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/novnc_view_only.py) to create a desktop with view-only noVNC access. The example reports only whether a URL exists. It does not print the URL.
+
+## Limit network and runtime access
+
+Use outbound domain or CIDR allowlists for a restricted workload. Use `network.block_all=True` with Connect ingress when the desktop needs no network access.
+
+Set Sandbox lifetime, idle policy, action budgets, screenshot budgets, artifact quotas, and recording limits. These controls bound resource use. They do not replace authentication.
+
+## Treat desktop data as sensitive
+
+Do not log these values:
+
+- noVNC URLs or daemon URLs.
+- Bearer tokens or provider keys.
+- Clipboard text or typed text.
+- Screenshot or recording bytes.
+- Artifact bytes or raw artifact locations.
+
+Structured SDK and daemon logs redact these values. Application logs and provider payload logs remain your responsibility.
+
+Artifact paths reject absolute paths, traversal, encoded traversal, symlink escape, and control characters. Treat accepted artifacts and recordings as sensitive run data until your application sanitizes them.
+
+## Own provider policy
+
+The OpenAI and Anthropic adapters normalize actions. They are not policy engines.
+
+Use `before_action` to review normalized actions before execution. Require confirmation for consequential external actions. Restrict domains. Define takeover rules.
+
+Treat page content, screenshots, tool output, and provider payloads as untrusted input. Keep provider credentials in the user application. Do not put them in core modules or the daemon image.
+
+## Respond to exposure
+
+If a noVNC URL becomes public, terminate the Sandbox. Create a new Sandbox to get a new tunnel and generated password.
+
+If a bearer token becomes public, terminate the affected resource and rotate any operator-managed credential. Review logs for use during the exposure window.
+
+Report a product vulnerability through the repository [security policy](https://github.com/ashtonchew/modal-computer-use/blob/main/SECURITY.md).

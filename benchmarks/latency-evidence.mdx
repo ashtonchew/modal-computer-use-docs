@@ -1,70 +1,40 @@
 ---
 sidebarTitle: "Latency evidence"
 title: "Latency evidence"
-description: "Review the focused evidence for batching, subprocess execution, native X11 input, and the recorded cost estimate."
+description: "Map each performance claim to the evidence that supports it."
 ---
 
-This page maps each focused latency claim to the artifact that supports it. Each artifact has a narrow scope.
+Use the narrowest artifact that answers your question.
 
 ## Evidence map
 
-| Question | Primary evidence | Result boundary |
+| Question | Primary evidence | Boundary |
 | --- | --- | --- |
-| Does one request reduce four-click overhead? | [Action-batching replication](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-action-batching-ab-replication-2026-08-02.json) | 30 samples per arm in one clean later run |
-| Does subprocess runner ownership affect command latency? | [Subprocess sample artifact](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-subprocess-runner-ab-samples-2026-07-30.json) | 30 tracked samples for each of three dated arms |
-| What supports the native X11 runner-effect claim? | [Native X11 runner matrix](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-native-x11-runner-matrix-2026-08-02.json) | 12 cells in three blocks, with 30 samples per cell |
-| Can a clean run reproduce the XTest direction? | [Native X11 clean replication](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-native-x11-backend-ab-replication-2026-08-02.json) | 30 samples per arm over matching Connect paths |
-| How was the six-cent value calculated? | [Cost estimate](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-optimized-provider-cost-estimate-2026-07-30.json) | Recorded wall time and July 29 list rates |
+| Fused action-to-frame latency | [Computer Step report](https://github.com/ashtonchew/modal-computer-use/blob/f6b9adeee54f584c345c813750758b7c7b5db744/docs/benchmark-results-2026-08-08-computer-step.md) | 100 same-topology interleaved pairs per arm |
+| Raw binary screenshot default | [Optimized-default report](https://github.com/ashtonchew/modal-computer-use/blob/31bcafefbba2ba75653075a04b12ce2eb816c838/docs/benchmark-results-2026-08-08-optimized-default.md) | 30 same-topology interleaved samples per arm |
+| Weighted input-work default | [Input-capacity report](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmark-results-2026-08-08-input-capacity.md) | Three independent mixed XTest gates |
+| Managed standard Image lifecycle | [Image lifecycle report](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmark-results-2026-08-08-image-lifecycle.md) | 30 paired lifecycles per arm |
+| Ordered batching | [Batching replication](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-action-batching-ab-replication-2026-08-02.json) | 30 samples per arm |
+| Native XTest direction | [X11 replication](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-native-x11-backend-ab-replication-2026-08-02.json) | 30 matching Connect samples per arm |
 
-## Action batching
+## Keep latency terms separate
 
-The August 2 replication compared one ordered four-click request with four sequential click requests. The batch p50 was 10.34 ms. The sequential p50 was 21.05 ms. The measured p50 speedup was 2.04x.
+| Term | Starts | Ends |
+| --- | --- | --- |
+| Cold allocation | Before Sandbox creation | Modal allocates the Sandbox |
+| Startup | After allocation | Daemon, desktop, auth, and required readiness complete |
+| Borrow | Before lease setup | Placed client and lease are ready |
+| Action to immediate frame | Before Step request | Valid Step result is decoded |
+| First visual change | After action | Pixel verification confirms a changed frame or times out |
+| Application readiness | Application-defined | Application-defined |
 
-The replication retained 30 samples per arm. It had no failed or replacement samples. Placement and cleanup checks passed.
+The stable Step contract ends at the immediate frame. First visual change is experimental. Application readiness needs an application-specific signal.
 
-The earlier July 29 artifact reported a 2.33x p50 speedup. Its raw sample arrays are unavailable. The later replication confirms the direction, but it does not reconstruct or supersede the July 29 run.
+## X11 shared-memory evidence
 
-## Subprocess execution
+MSS remains the production screenshot source. The optional X11 shared-memory source failed its fixed promotion gate because repeated readiness measurements included capture timeouts. Keep rejected artifacts and timeout attribution with any future rerun. A short operational green run cannot replace a full promotion result.
 
-The July 30 supporting artifact retains caller-observed, daemon, and transport-overhead sample arrays for three subprocess backends:
+## Cost evidence
 
-- `asyncio`
-- `threaded`
-- `isolated-asyncio`
-
-The repository tests recompute summaries from those tracked arrays. Use this artifact when you need to verify the dated subprocess result from a fresh clone.
-
-Each arm came from a separate run. The artifact preserves the original generated time and raw digest for each arm. Do not treat the arrays as paired observations.
-
-## Native X11 input
-
-Use the runner matrix as the primary source for the runner-effect claim. The matrix varied two inputs:
-
-- Input backend: XTest or `xdotool`
-- Subprocess backend: shared asyncio or isolated asyncio
-
-It ran all four cells in each of three blocks. Each cell used a fresh Sandbox, one warmup, and 30 measured samples. All 12 cells passed the measurement and input checks.
-
-For `xdotool` move-click, the shared asyncio runner was slower than the isolated runner in every block. The pooled shared-runner daemon mean was 122.62 ms. This value fell within the preregistered 25 percent range around the historical 146.33 ms mean.
-
-The launch-scaling control supports an approximately 45 ms shared-runner contribution per `xdotool` launch. A move-click uses two launches. This matches the approximately 90 ms matrix delta without treating the historical and clean runs as one distribution.
-
-The XTest move-click control stayed within the matrix gate in every block. The matrix therefore supports a subprocess-runner contribution under the controlled modern conditions. It does not assign the full historical difference to one cause.
-
-The historical `146.33 ms` and `1.15 ms` values came from a three-sample dirty-worktree diagnostic. The [historical source manifest](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-native-x11-historical-source-2026-07-23.json) preserves the exact source and rounded aggregates. It does not preserve the original sample arrays or their digests.
-
-The clean replication measured move-click daemon means of 32.78 ms for `xdotool` and 1.56 ms for XTest. These values reproduce the direction under a different topology. They are not current replacements for the historical values.
-
-## Sandbox termination evidence
-
-The matrix runner recorded `ComputerSandbox.terminate(wait=True)` followed by client close for each cell. Focused tests verify that order. They also verify cleanup on benchmark and termination failures.
-
-A later read-only Modal lookup found all 12 Sandboxes in a finished state with exit code 137. Modal documents code 137 for a user-terminated Sandbox. The [termination reconciliation](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-native-x11-sandbox-termination-reconciliation-2026-08-03.json) does not prove an audit-log event, an invoice entry, or historical handle detachment.
-
-## Cost estimate
-
-The recorded run wall time was 520.875 seconds. The formula applies that duration to one 1 CPU, 2 GiB Function and one 1 CPU, 2 GiB Sandbox. It then applies the recorded July 29 rates and a 1.75 region multiplier.
-
-The result is $0.06408. The rounded claim is about six cents.
-
-`billing_reconciled` is `false`. The estimate excludes image builds, storage, network transfer, model usage, plan fees, credits, discounts, taxes, and additional non-overlapping resource lifetimes. Treat it as a list-price reconstruction, not an invoice.
+Cost estimates use recorded resource duration and list rates. Invoice reconciliation requires any
+unmeasured image builds, storage, network, model usage, plan fees, credits, and taxes.

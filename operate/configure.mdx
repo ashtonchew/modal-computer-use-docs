@@ -1,93 +1,76 @@
 ---
-title: "Configure a desktop"
+title: "Configure placement, cost, and limits"
 sidebarTitle: "Configure"
-description: "Set desktop, runtime, network, storage, browser, action, and budget policy."
+description: "Set explicit placement, resources, Image policy, input limits, and warm capacity."
 ---
 
-Use `ComputerConfig` when the SDK creates a Modal Sandbox. Use daemon environment variables only when you launch the daemon directly.
+Use `ComputerConfig` when the SDK creates a Sandbox. A directly launched daemon reads its process
+environment.
 
-All configuration models reject unknown fields. A misspelled field fails validation.
-
-## Build one configuration object
+## Build one inspectable configuration
 
 ```python
-from modal_computer_use import (
-    ActionConfig,
-    BrowserConfig,
-    BudgetConfig,
-    ComputerConfig,
-    DesktopConfig,
-    NetworkConfig,
-    ResourceConfig,
-    RuntimeConfig,
-)
+from modal_computer_use import ComputerConfig
 
 config = ComputerConfig(
-    desktop=DesktopConfig(resolution=(1280, 800)),
-    runtime=RuntimeConfig(timeout_seconds=3600),
-    resources=ResourceConfig(profile="browser", cpu=2, memory_mib=4096),
-    network=NetworkConfig(outbound_domain_allowlist=["example.com"]),
-    browser=BrowserConfig(kind="chromium", prewarm=True),
-    actions=ActionConfig(max_batch_actions=25),
-    budgets=BudgetConfig(max_actions=200, max_screenshots=100),
+    ingress="attested-tunnel",
+    runtime={
+        "modal_environment": "main",
+        "modal_region": "us-west-2",
+        "timeout_seconds": 900,
+        "readiness_timeout_seconds": 120,
+    },
+    resources={"profile": "browser", "cpu": 1.0, "memory_mib": 2048},
+    image={"source": "inline"},
+    browser={"kind": "chromium", "prewarm": False},
+    actions={
+        "input_rate_limit_per_sec": 100,
+        "input_rate_limit_burst": 400,
+        "screenshot_capture_source": "mss",
+    },
 )
+
+print(config.resolved_cost_and_placement())
 ```
 
-## Choose each configuration family
+The example region and resources are application choices. Measure your workload before changing
+them.
 
-| Family | Controls |
+## Keep cost-bearing choices explicit
+
+| Choice | Default policy |
 | --- | --- |
-| `desktop` | Resolution, DPI, color depth, and window manager. |
-| `runtime` | Sandbox lifetime, idle timeout, readiness timeout, Modal environment, and requested region. |
-| `resources` | Image profile, CPU, memory, and GPU request. |
-| `image` | Inline or named image selection and revision. |
-| `network` | Network blocking, allowlists, and daemon HTTP version. |
-| `storage` | Artifact paths, recording paths, traces, and Volume-backed persistence. |
-| `browser` | Browser kind, prewarm, profile, launch arguments, startup URL, and GPU mode. |
-| `actions` | Batch limits, timeouts, rate limit, input backend, and subprocess backend. |
-| `budgets` | Action, screenshot, artifact, recording, and daemon idle limits. |
+| Region | No universal SDK region |
+| CPU and memory | No universal SDK values |
+| Image | Inline recipe |
+| Function minimum containers | Application setting, zero in the primary example |
+| Sandbox warm pool | Off |
+| Browser prewarm | Explicit application choice |
 
-Use [configuration model reference](/reference/config-models) for every field and accepted value.
+## Configure screenshot capture
 
-## Set lifecycle bounds
+| SDK value | Daemon value | Behavior |
+| --- | --- | --- |
+| `mss` | `COMPUTER_USE_SCREENSHOT_CAPTURE_SOURCE=mss` | Production default |
+| `auto` | `...=auto` | Probe X11-SHM, then allow ordinary MSS fallback |
+| `x11-shm` | `...=x11-shm` | Require the optional native source |
 
-`runtime.timeout_seconds` limits the total Sandbox lifetime. `runtime.idle_timeout_seconds` is a Modal idle policy.
+Explicit X11-SHM requires a managed Image containing the extension. A display reply timeout fails
+closed. See [screenshots and recordings](/build/screenshots-recordings).
 
-`budgets.max_idle_seconds` is different. The daemon enforces it from budget-counted activity.
+## Configure weighted input admission
 
-Warm-pool configurations cannot set `runtime.idle_timeout_seconds`. They also cannot set an explicit VNC password.
+The defaults use 100 normalized input-work tokens per second and a 400-token burst. The daemon
+reserves a complete recursive batch before mutation.
 
-## Set ingress and network policy
+Run the same-runtime capacity gate before you raise both values. CPU and memory alone cannot select
+a reliable limit.
 
-`ComputerConfig.ingress` defaults to `attested-tunnel`. Use `connect` when `network.block_all=True`.
+## Protect secrets
 
-`network.block_all` cannot be combined with a network allowlist. It also requires VNC to be off.
+Treat bearer tokens, noVNC URLs and passwords, browser startup URLs, typed text, clipboard text,
+screenshot bytes, and artifact bytes as secrets. Configuration validation hides rejected values.
 
-Pin `runtime.modal_region` only after you measure from the real caller. The requested region is part of the configuration hash.
-
-## Configure noVNC explicitly
-
-Use one string value:
-
-| Value | Effect |
-| --- | --- |
-| `"off"` | Does not start VNC. |
-| `"view_only"` | Lets an operator watch without sending input. |
-| `"control"` | Lets an operator watch and send input. |
-
-```python
-config = ComputerConfig(expose_vnc="view_only")
-```
-
-<Warning>
-Boolean `expose_vnc=True` is a compatibility input for `"control"`. It is not view-only. Use the string value so the permission is clear.
-</Warning>
-
-## Understand precedence
-
-Values passed to `ComputerConfig` replace Pydantic defaults. The explicit `expose_vnc=` argument to `create()` replaces `config.expose_vnc`. The explicit `image=` argument replaces SDK image selection.
-
-A directly launched daemon reads its process environment when settings are created. It does not read a daemon configuration file.
-
-Treat tokens, passwords, startup URLs, daemon URLs, and noVNC URLs as sensitive.
+Read the [configuration reference](/reference/configuration) for every field and environment
+variable.
 
