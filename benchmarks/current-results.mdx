@@ -1,72 +1,59 @@
 ---
 sidebarTitle: "Current results"
 title: "Current benchmark results"
-description: "Review the dated results used for the 2.0 release decision."
+description: "View the current July 30 warm-operation benchmark results and their comparison limits."
 ---
 
-These reports use separate experiments and scopes. Compare values only within the matched arms described by each report.
+The current report was recorded on July 30, 2026. It measures warm operations after the desktop and connection were ready. It excludes Sandbox creation and cleanup.
 
-## Computer Step
+Each cell contains 30 successful samples. Values are milliseconds. The ratio divides the provider path p50 by the Modal optimized p50 for the same case.
 
-The 8 August 2026 promotion run measured one ordered action batch and its immediate screenshot as one fused HTTP operation.
+## Warm-operation results
 
-| Same-topology arm | p50 | p95 |
-| --- | ---: | ---: |
-| `actions.run()` then `screenshots.full()` | 47.14 ms | 58.22 ms |
-| `computer.step()` | **44.29 ms** | **52.57 ms** |
+Lower is better.
 
-The run retained 100 interleaved pairs per arm. It recorded zero failures, retries, replacements, and cleanup survivors. The source was [`f6b9adeee54f584c345c813750758b7c7b5db744`](https://github.com/ashtonchew/modal-computer-use/blob/f6b9adeee54f584c345c813750758b7c7b5db744/docs/benchmark-results-2026-08-08-computer-step.md).
+[![Warm-operation p50 latency for six tasks on July 30, 2026. Modal optimized recorded the lowest p50 in each task. The tested setups differed.](https://raw.githubusercontent.com/ashtonchew/modal-computer-use/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/assets/warm-operation-p50-2026-07-30.svg)](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmark-results-2026-07-30-warm-paths.md)
 
-The Step frame is immediate. Changed pixels and application readiness use separate timers.
+| Case | Modal optimized p50 / p95 | Daytona default p50 / p95 / ratio | E2B default p50 / p95 / ratio | Modal simple p50 / p95 / ratio | Tzafon default p50 / p95 / ratio |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Screenshot | 37.25 / 48.76 | 563.57 / 603.79 / 15.13x | 198.78 / 223.20 / 5.34x | 115.80 / 132.91 / 3.11x | 154.25 / 192.53 / 4.14x |
+| One click | 9.85 / 16.85 | 386.40 / 394.19 / 39.22x | 209.86 / 213.42 / 21.30x | 214.09 / 218.19 / 21.73x | 130.27 / 170.55 / 13.22x |
+| Four ordered clicks | 12.52 / 22.07 | 1546.74 / 1577.44 / 123.50x | 860.68 / 897.95 / 68.72x | 230.10 / 235.09 / 18.37x | 458.03 / 499.49 / 36.57x |
+| Type 100 characters | 15.76 / 28.15 | 805.55 / 812.84 / 51.11x | 4083.30 / 4156.65 / 259.08x | 259.67 / 270.18 / 16.48x | 85.16 / 101.65 / 5.40x |
+| Type 1000 characters | 53.35 / 79.69 | 5528.38 / 5554.88 / 103.63x | 40914.66 / 41374.28 / 766.95x | 263.95 / 269.71 / 4.95x | 185.03 / 188.37 / 3.47x |
+| Shell command | 11.69 / 14.12 | 285.33 / 294.57 / 24.40x | 55.90 / 69.27 / 4.78x | 72.64 / 158.22 / 6.21x | 31.73 / 33.35 / 2.71x |
 
-## Raw binary screenshot default
+## Comparison design
 
-The optimized-default gate measured a full semantic screenshot followed by one pointer move.
+Modal optimized runs the controlling code in a Modal Function and requests the same region for the desktop Sandbox. It also uses the other [documented optimizations](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmark-results-2026-07-30-warm-paths.md).
 
-| Same-topology arm | p50 | p95 |
-| --- | ---: | ---: |
-| Retained JSON/base64 screenshot path | 147.27 ms | 763.47 ms |
-| Raw binary screenshot with `Screenshot` reconstruction | **81.11 ms** | **739.17 ms** |
+Modal simple calls the public `ComputerSandbox` API from the benchmark runner. It uses standard resources, default input pacing, and the attested-tunnel daemon path.
 
-Both arms retained 30 interleaved samples. The source was [`31bcafefbba2ba75653075a04b12ce2eb816c838`](https://github.com/ashtonchew/modal-computer-use/blob/31bcafefbba2ba75653075a04b12ce2eb816c838/docs/benchmark-results-2026-08-08-optimized-default.md).
+The remaining paths, [E2B Computer Use](https://e2b.dev/docs/use-cases/computer-use), [Daytona Computer Use](https://www.daytona.io/docs/en/computer-use/), and [Tzafon Computer Use](https://docs.tzafon.ai/overview), call each provider directly from the benchmark runner and use their recorded computer-use SDK defaults.
 
-This timer used two SDK operations. The Computer Step table above contains the fused measurement.
+The benchmark applies the same six logical tasks to each path. Each result cell contains 30 successful samples. The path configurations, screenshot formats, and request shapes differ. The results compare these recorded paths. They do not rank provider infrastructure in isolation or show the fastest possible configuration for every provider.
 
-## Input-work capacity
+All timers include transport, authentication, request handling, operation execution, and response collection.
 
-The minimum tested runtime ran three independent mixed XTest capacity gates.
+## Comparison limits
 
-| Run | Weighted tokens per second | Batch p95 | RSS growth |
-| --- | ---: | ---: | ---: |
-| 1 | 527.40 | 131.89 ms | 0 B |
-| 2 | 505.14 | 148.10 ms | 3,817,472 B |
-| 3 | 380.70 | 206.17 ms | 29,941,760 B |
+The shared region request does not prove the same host or availability zone.
 
-Each run completed 80 batches of 48 ordered actions. The product default is a 100-token refill with a 400-token burst. The [input-capacity report](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmark-results-2026-08-08-input-capacity.md) explains the two-times safety margin and weighted costs.
+Screenshot formats differ. Tzafon returned a 1280 by 720 JPEG. The other paths returned a 1024 by 768 PNG.
 
-## Managed Image lifecycle
+The four-click request shape differs. Modal optimized, Modal simple, and Tzafon used one request. Daytona used four SDK calls. E2B used four SDK calls through eight transport calls.
 
-The managed standard Image completed 60 of 60 measured lifecycles with successful cleanup.
+The Modal optimized path and provider-default paths also differ in caller placement and configuration. Treat the ratios as path comparisons. Do not use them as isolated provider rankings.
 
-| Metric | Inline recipe | Managed exact ID | Change |
-| --- | ---: | ---: | ---: |
-| p50 | 15.47 s | 14.08 s | -8.95 percent |
-| p95 | 44.68 s | 43.27 s | -3.15 percent |
+Native async provider APIs became available after these measurements. The July 30 report measured the synchronous colocated path only.
 
-The paired mean confidence interval crossed zero because both arms had large tail outliers. The
-result supports an opt-in managed standard Image. A universal default needs separate availability,
-rollback, and variant evidence. See the [image lifecycle report](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmark-results-2026-08-08-image-lifecycle.md).
+## Sources
 
-## Historical 47.10 ms figure
+- [Current July 30 report](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmark-results-2026-07-30-warm-paths.md)
+- [Modal optimized artifact](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-optimized-provider-2026-07-30.json)
+- [Provider comparison artifact](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/provider-compare-coordinate-command-2026-07-30.json)
+- [Archived July 26 report](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/archive/benchmarks/benchmark-results-2026-07-26-provider-results.md)
 
-The article combined separate medians:
-
-- Raw screenshot: 37.25 ms
-- Click: 9.85 ms
-- Arithmetic sum: 47.10 ms
-
-No fused request produced that historical value. The later Computer Step experiment measured a fused action-to-immediate-frame p50 of 44.29 ms. Keep the dates and scopes with both figures.
-
-## Historical provider comparison
-
-The [30 July warm-path report](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmark-results-2026-07-30-warm-paths.md) remains historical evidence. Its provider paths used different caller placement, screenshot formats, and request shapes.
+<Note>
+  The July 26 report is archived. Use it for historical lifecycle and first-visual-change evidence, not current provider figures.
+</Note>

@@ -1,63 +1,70 @@
 ---
-title: "Measure and reduce trajectory latency"
+title: "Reduce desktop loop latency"
 sidebarTitle: "Performance"
-description: "Separate startup from warm work and measure the placed action-to-frame path."
+description: "Measure startup and warm operations, then reduce the work on the measured path."
 ---
 
-## Keep one warm trajectory
+Measure startup and warm operations as separate paths. A change that reduces startup time might not change action latency.
 
-Create the desktop once. Place the application Function in the same exact requested region. Enter
-one borrow. Reuse its pooled async client and authentication state for every warm operation.
+## Keep one session for the trajectory
 
-Every request still crosses authenticated Modal ingress.
+Create the desktop once. Keep one connection open across the repeated observe, model, and action loop.
 
-## Measure lifecycle stages separately
+Use `AsyncComputerSandbox` when your application already uses asyncio. Native async keeps the event loop responsive during Modal and daemon I/O. It does not make Sandbox allocation faster.
 
-| Stage | Boundary |
+For a deployed Modal Function, enter one `borrow_async()` context around the complete trajectory. Do not borrow once per action.
+
+## Place the caller after measurement
+
+Run the Modal region benchmark from the real caller. Apply the measured region selector to the desktop and to any deployed Function.
+
+A shared region request is a scheduling request. It does not prove a shared host or availability zone.
+
+Keep public gateways, brokers, and durable stores outside the screenshot and action path. They can still own admission, recovery, and audit records.
+
+## Reduce work per turn
+
+| Need | Operation |
 | --- | --- |
-| Cold allocation | Sandbox request to allocation |
-| Desktop startup | Allocation to desktop readiness |
-| Function dispatch | Invocation to Function start |
-| Borrow entry | Borrow request to ready leased client |
-| Warm operation | Request start to validated result |
-| Cleanup | Lease release and owned termination |
+| Several actions with no intermediate decision | `computer.actions.run([...])` |
+| Actions and one immediate binary frame | `computer.actions.run_and_screenshot_bytes(...)` |
+| The first detected visual change | `computer.actions.run_and_observe_change_screenshot_bytes(...)` |
+| One persistent low-overhead connection | Hot-session WebSocket |
+| Continuous frames | Observation stream |
 
-Native async provisioning protects cancellation and cleanup. Modal allocation and desktop startup
-retain their normal timing.
+Batching saves network round trips. The daemon validates the complete batch before execution. It stops on the first error by default.
 
-## Use one step per model turn
+An immediate post-action screenshot does not prove that an application is ready. Use an application predicate when the next step needs a semantic state.
 
-`computer.step(actions)` sends the ordered action array and receives one versioned binary envelope.
-The result contains the action result, immediate screenshot, and timing.
+## Prepare the browser and image
 
-The 8 August Computer Step benchmark measured 100 interleaved pairs in one fixed topology. Step
-measured 44.29 ms p50 and 52.57 ms p95. The prior two-request path measured 47.14 ms p50 and
-58.22 ms p95.
+Use `ResourceConfig(profile="browser")` with `BrowserConfig` for browser work. Prewarm the browser only after browser startup appears in the measured path.
 
-The article's 47.10 ms value adds separate 37.25 ms screenshot and 9.85 ms click medians. The later
-Computer Step experiment provides the fused measurement. Both figures apply only to their recorded
-topology and workload.
+Add CPU, memory, or GPU only when measurements show sustained demand. A GPU allocation does not prove that an X11 browser uses hardware rendering.
 
-## Keep observation meanings separate
-
-| Observation | Meaning |
-| --- | --- |
-| Immediate step frame | Capture completed after action synchronization |
-| First visual change | Experimental pixel change verification |
-| Application readiness | Your workload-specific predicate passed |
-
-## Compare screenshot sources carefully
-
-MSS remains the default. X11-SHM remains opt-in because its fixed promotion campaign failed required
-gates. A paired performance result requires matched fixture and campaign payloads.
-
-Record the source, format, dimensions, capture backend, daemon timing, caller timing, failures, and
-cleanup for every comparison.
+Use named image revisions for stable system and Python dependencies. Keep changing application files in later image layers.
 
 ## Use warm capacity deliberately
 
-Positive Function minimums and Sandbox pools add idle cost. Browser prewarm moves browser startup
-into the cold path. Measure arrival patterns and reconcile billing before enabling either capacity
-mechanism.
+Positive Function capacity reduces Function cold starts. A desktop warm pool reduces request-to-ready time.
 
-Read the [benchmark guide](/benchmarks/run) for commands and fixed evidence rules.
+<Warning>
+Both forms of warm capacity add idle cost. Record the pool hit rate, cold fallback rate, remaining lifetime, and reconciled billing data.
+</Warning>
+
+## Record a complete measurement
+
+Record these facts with each result:
+
+- Caller location and topology.
+- Requested and observed placement.
+- Ingress, image revision, resources, and browser setup.
+- Cold or warm state.
+- Exact timer start and end.
+- Raw samples, failures, cleanup, and cost state.
+
+Use at least 30 measured samples when you report p95. Keep the raw samples. Record the clean evidence revision.
+
+The [July 30, 2026 report](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmark-results-2026-07-30-warm-paths.md) contains 30 successful samples per cell. Its optimized path used a synchronous Modal Function caller and tuned daemon settings. Treat those numbers as dated evidence for that recorded topology. Do not treat them as a promise for another workload.
+
+Use the [benchmarking guide](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmarking.md) for commands, evidence status, statistics, cost accounting, and publication rules.

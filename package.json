@@ -17,31 +17,31 @@
     "check": "npm run test && npm run check:source && npm run validate && npm run check:links && npm run check:a11y && npm run check:dependencies"
   },
   "devDependencies": {
-    "mint": "4.2.791"
+    "mint": "4.2.773"
   },
   "overrides": {
     "adm-zip": "0.6.0",
     "axios": "1.18.0",
     "@mintlify/cli": {
-      "js-yaml": "4.3.1"
+      "js-yaml": "4.3.0"
     },
     "@mintlify/common": {
-      "js-yaml": "4.3.1"
+      "js-yaml": "4.3.0"
     },
     "@mintlify/prebuild": {
-      "js-yaml": "4.3.1"
+      "js-yaml": "4.3.0"
     },
     "@mintlify/previewing": {
-      "js-yaml": "4.3.1"
+      "js-yaml": "4.3.0"
     },
     "@mintlify/scraping": {
-      "js-yaml": "4.3.1"
+      "js-yaml": "4.3.0"
     },
     "@mintlify/validation": {
-      "js-yaml": "4.3.1"
+      "js-yaml": "4.3.0"
     },
     "front-matter": {
-      "js-yaml": "3.15.1"
+      "js-yaml": "3.14.2"
     },
     "postcss": "8.5.23",
     "qs": "6.15.2",

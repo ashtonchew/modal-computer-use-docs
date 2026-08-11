@@ -1,19 +1,26 @@
 ---
 sidebarTitle: "Run benchmarks"
 title: "Run benchmarks"
-description: "Run credential-free checks and authorized Modal benchmarks."
+description: "Run credential-free and Modal benchmarks with the repository benchmark commands."
 ---
 
-Start with a credential-free report.
+Start with a credential-free run. Use a live Modal run only when you need provider evidence.
 
 ## Run a local report
 
+Install the development environment:
+
 ```bash
 uv sync --extra dev
+```
+
+Run the release report against the in-process mock daemon:
+
+```bash
 uv run computer-use benchmark report --mock-local --iterations 5
 ```
 
-Run the ordered batch comparison:
+Run the action-batch comparison:
 
 ```bash
 uv run computer-use benchmark action-batch \
@@ -23,37 +30,90 @@ uv run computer-use benchmark action-batch \
   --iterations 5
 ```
 
-These commands create no Modal resources.
+These commands do not create Modal resources.
 
-## Run the 2.0 promotion gates
+## Run against an existing daemon
 
-Each live script requires an explicit authorization flag, Modal credentials, a clean source revision, fixed placement and resources, retries set to zero, and a fresh output directory.
+Replace `--mock-local` with a daemon URL. Add a token when the daemon requires one.
 
-| Gate | Command |
-| --- | --- |
-| Raw binary SDK default | `uv run python scripts/run_optimized_default_promotion.py --help` |
-| Computer Step | `uv run python scripts/run_step_promotion.py --help` |
-| Input-work capacity | `uv run python scripts/run_input_capacity_gate.py --help` |
-| Managed Image lifecycle | `uv run python scripts/run_image_lifecycle_benchmark.py --help` |
+```bash
+uv run computer-use benchmark report \
+  --base-url http://127.0.0.1:8080 \
+  --token dev \
+  --iterations 5 \
+  --output benchmark-results/report.json
+```
 
-Read the [canonical benchmark procedure](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmarking.md) before a live run. It defines the exact flags, timer boundaries, cost ceiling, cleanup, sanitization, and promotion rules.
+The report command does not create a Sandbox. The optional `--include-sandbox-exec` mode attaches to an existing Sandbox when you provide its ID.
+
+## Run a live Modal SDK benchmark
+
+Install the Modal extra and authenticate:
+
+```bash
+uv sync --extra modal
+uv run modal setup
+```
+
+Run the SDK benchmark:
+
+```bash
+uv run computer-use benchmark sdk \
+  --create-modal-sandbox \
+  --surfaces daemon-http \
+  --browser chromium \
+  --resource-profile browser \
+  --iterations 30 \
+  --output benchmark-results/modal-sdk.json
+```
+
+This command creates a billable Sandbox. It waits for readiness. It attempts termination and detachment after the run.
 
 <Warning>
-Live commands create billable Modal resources. Record an approved cost ceiling. Poll each run to a terminal state. Check the provider console after cleanup.
+  Live commands can create billable resources. Record a cost ceiling before the run. Inspect the provider console after cleanup.
 </Warning>
 
-## Keep measurements comparable
+## Run the current Modal optimized path
 
-- Use one exact source commit and a clean worktree.
-- Record requested and observed placement.
-- Hold resources, Image, ingress, HTTP version, input backend, screenshot options, and warm capacity constant.
-- Interleave matched arms according to the preregistered schedule.
-- Keep failures. Use no replacement samples.
-- Report cleanup failures and survivors.
-- Separate cold allocation, startup, Function dispatch, borrow, and warm operations.
+Use a clean commit. Publish revision-addressed images before you run the benchmark.
 
-## Store evidence safely
+```bash
+evidence_harness_sha="$(git rev-parse HEAD)"
+test -z "$(git status --porcelain)"
 
-Write raw output under ignored `benchmark-results/`. Remove endpoint URLs, resource IDs, tokens, screenshots, typed text, clipboard text, and raw failure content before promotion.
+uv run python scripts/publish_modal_images.py --revision "$evidence_harness_sha"
 
-Publish only a sanitized artifact accepted by its repository validator. Keep dated reports and artifacts immutable.
+uv run computer-use benchmark modal-optimized-provider \
+  --modal-region us-west-2 \
+  --image-revision "$evidence_harness_sha" \
+  --modal-cpu 1 \
+  --modal-memory-mib 2048 \
+  --runner-cpu 1 \
+  --runner-memory-mib 2048 \
+  --browser chromium \
+  --iterations 30 \
+  --warmup-iterations 1 \
+  --output benchmark-results/modal-optimized-provider.json
+```
+
+The command measures fresh lifecycle samples and six warm-operation cases. It fails when a required sample, placement check, or cleanup gate fails.
+
+## Run a focused experiment
+
+Use the command that owns the question:
+
+| Question | Command |
+| --- | --- |
+| Does one request reduce four-click overhead? | `computer-use benchmark modal-action-batching-ab` |
+| How does Modal placement affect the caller path? | `computer-use benchmark modal-region-ab` |
+| How does a colocated runner behave? | `computer-use benchmark modal-colocated-client` |
+| How do provider-default SDK paths compare? | `computer-use benchmark compare` |
+| How does ingress affect the optimized path? | `computer-use benchmark modal-optimized-ingress-ab` |
+
+Read the exact flags and gates in the [canonical benchmark procedure](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmarking.md) before you run a publishable experiment.
+
+## Keep raw output private
+
+Write raw output under `benchmark-results/`. Do not write it at the repository root. Do not commit credentials, endpoint URLs, resource identifiers, screenshots, typed text, clipboard text, or raw failure content.
+
+Promote only a sanitized artifact that passes its repository validator. The [benchmark data policy](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/README.md) defines that promotion boundary.

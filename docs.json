@@ -18,185 +18,89 @@
     "codeblocks": "system"
   },
   "navigation": {
-    "versions": [
+    "tabs": [
       {
-        "version": "2.x",
-        "tag": "Latest",
-        "default": true,
-        "tabs": [
+        "tab": "Documentation",
+        "icon": "book",
+        "groups": [
           {
-            "tab": "Documentation",
-            "icon": "book",
-            "groups": [
-              {
-                "group": "Getting started",
-                "pages": [
-                  "index",
-                  "start/installation",
-                  "start/quickstart",
-                  "start/examples"
-                ]
-              },
-              {
-                "group": "Desktop workflows",
-                "pages": [
-                  "build/create-and-attach",
-                  "build/browser-automation",
-                  "build/action-batches",
-                  "build/screenshots-recordings",
-                  "build/artifacts-storage",
-                  "build/session-handoff",
-                  "build/run-gateway"
-                ]
-              },
-              {
-                "group": "Model integrations",
-                "pages": [
-                  "integrate/openai",
-                  "integrate/anthropic"
-                ]
-              },
-              {
-                "group": "Deployment and operations",
-                "pages": [
-                  "operate/deploy",
-                  "operate/configure",
-                  "operate/warm-capacity",
-                  "operate/performance",
-                  "operate/security",
-                  "operate/troubleshooting"
-                ]
-              }
+            "group": "Getting started",
+            "pages": [
+              "index",
+              "start/installation",
+              "start/quickstart",
+              "start/examples"
             ]
           },
           {
-            "tab": "Benchmarks",
-            "icon": "stopwatch",
-            "groups": [
-              {
-                "group": "Results and evidence",
-                "pages": [
-                  "benchmarks/overview",
-                  "benchmarks/current-results",
-                  "benchmarks/latency-evidence"
-                ]
-              },
-              {
-                "group": "Run and reproduce",
-                "pages": [
-                  "benchmarks/run",
-                  "benchmarks/reproducibility"
-                ]
-              }
+            "group": "Desktop workflows",
+            "pages": [
+              "build/create-and-attach",
+              "build/browser-automation",
+              "build/action-batches",
+              "build/screenshots-recordings",
+              "build/artifacts-storage",
+              "build/session-handoff"
             ]
           },
           {
-            "tab": "API Reference",
-            "icon": "code",
-            "groups": [
-              {
-                "group": "Python SDK",
-                "pages": [
-                  "reference/overview",
-                  "reference/configuration",
-                  "reference/namespaces",
-                  "reference/errors-and-models"
-                ]
-              },
-              {
-                "group": "Daemon API",
-                "pages": ["reference/openapi"]
-              }
+            "group": "Model integrations",
+            "pages": [
+              "integrate/openai",
+              "integrate/anthropic"
+            ]
+          },
+          {
+            "group": "Deployment and operations",
+            "pages": [
+              "operate/deploy",
+              "operate/configure",
+              "operate/warm-capacity",
+              "operate/performance",
+              "operate/security",
+              "operate/troubleshooting"
             ]
           }
         ]
       },
       {
-        "version": "1.x",
-        "tag": "Previous",
-        "tabs": [
+        "tab": "Benchmarks",
+        "icon": "stopwatch",
+        "groups": [
           {
-            "tab": "Documentation",
-            "icon": "book",
-            "groups": [
-              {
-                "group": "Getting started",
-                "pages": [
-                  "v1/index",
-                  "v1/start/installation",
-                  "v1/start/quickstart",
-                  "v1/start/examples"
-                ]
-              },
-              {
-                "group": "Desktop workflows",
-                "pages": [
-                  "v1/build/create-and-attach",
-                  "v1/build/browser-automation",
-                  "v1/build/action-batches",
-                  "v1/build/screenshots-recordings",
-                  "v1/build/artifacts-storage",
-                  "v1/build/session-handoff"
-                ]
-              },
-              {
-                "group": "Model integrations",
-                "pages": [
-                  "v1/integrate/openai",
-                  "v1/integrate/anthropic"
-                ]
-              },
-              {
-                "group": "Deployment and operations",
-                "pages": [
-                  "v1/operate/deploy",
-                  "v1/operate/configure",
-                  "v1/operate/warm-capacity",
-                  "v1/operate/performance",
-                  "v1/operate/security",
-                  "v1/operate/troubleshooting"
-                ]
-              }
+            "group": "Results and evidence",
+            "pages": [
+              "benchmarks/overview",
+              "benchmarks/current-results",
+              "benchmarks/latency-evidence"
             ]
           },
           {
-            "tab": "Benchmarks",
-            "icon": "stopwatch",
-            "groups": [
-              {
-                "group": "Results and evidence",
-                "pages": [
-                  "v1/benchmarks/overview",
-                  "v1/benchmarks/current-results",
-                  "v1/benchmarks/latency-evidence"
-                ]
-              },
-              {
-                "group": "Run and reproduce",
-                "pages": [
-                  "v1/benchmarks/run",
-                  "v1/benchmarks/reproducibility"
-                ]
-              }
+            "group": "Run and reproduce",
+            "pages": [
+              "benchmarks/run",
+              "benchmarks/reproducibility"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "icon": "code",
+        "groups": [
+          {
+            "group": "Python SDK",
+            "pages": [
+              "reference/overview",
+              "reference/configuration",
+              "reference/namespaces",
+              "reference/errors-and-models"
             ]
           },
           {
-            "tab": "API Reference",
-            "icon": "code",
-            "groups": [
-              {
-                "group": "Python SDK",
-                "pages": [
-                  "v1/reference/overview",
-                  "v1/reference/configuration",
-                  "v1/reference/namespaces",
-                  "v1/reference/errors-and-models"
-                ]
-              },
-              {
-                "group": "Daemon API",
-                "pages": ["v1/reference/openapi"]
-              }
+            "group": "Daemon API",
+            "pages": [
+              "reference/openapi"
             ]
           }
         ]

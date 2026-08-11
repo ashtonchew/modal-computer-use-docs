@@ -12,30 +12,11 @@ Read the per-check failure list from `/readyz`. Modal's TCP probe can pass befor
 
 Use `computer.processes.logs("xvfb")` when Xvfb fails. Confirm that `DISPLAY` matches the configured display. The default is `:99`.
 
-If the error names placement, compare the exact requested Function region, observed Function
-region, and target region. Use an exact selector such as `us-west-2` for the placed path.
-
-If the error names `computer-step-envelope-v1`, install a daemon that supports the 2.x step
-protocol. Keep the failed operation stopped until the compatibility check passes.
-
 ## A screenshot is black or empty
 
 Wait for `/readyz`. Confirm that the target application has a mapped window.
 
 Use `computer.windows.wait_for(...)` after you launch an application. An immediate screenshot can arrive before the window manager draws the first frame.
-
-## X11-SHM fails readiness
-
-MSS is the default. Choose X11-SHM only when the managed Image contains the native extension and
-worker. Confirm that Xvfb uses 24-bit TrueColor and that the native module imports inside the
-Sandbox.
-
-`auto` can use MSS after an ordinary native failure. Explicit `x11-shm` fails closed when its source
-is unavailable. A display reply timeout also fails closed because MSS and file-capture tools depend
-on the same unresponsive display.
-
-A display restart closes generation-bound X11 clients before it relaunches dependents and proves
-readiness. Keep the source opt-in after recovery.
 
 ## Keyboard input does not appear
 
@@ -57,8 +38,7 @@ Read these response headers for one successful direct request:
 | `X-Computer-Use-Window-Backend` | Window control. |
 | `X-Computer-Use-Capture-Backend` | Raw screenshot capture. |
 
-Use `/v1/capabilities` for process configuration and readiness. Use per-response headers to
-attribute concurrent requests.
+Use `/v1/capabilities` for process configuration and readiness. Do not use the legacy last-selected backend field to attribute concurrent requests.
 
 ## Provider actions click the wrong place
 
@@ -78,21 +58,13 @@ For Modal Volume v2, mount the Volume over the artifact path. Set `StorageConfig
 
 Reload an already-mounted reader before you check for committed data. Use a run-specific path. Do not let two writers replace the same file.
 
-Immediate sync requires Modal Volume v2.
+Modal Volume v1 is not a supported immediate-sync target for this package.
 
 ## Browser prewarm did not help
 
-Confirm that `/v1/capabilities` reports `browser` or `browser-gpu` as the image profile. Prewarm
-moves browser startup into desktop startup. Page network, authentication, and rendering time remain
-in the first navigation.
+Confirm that `/v1/capabilities` reports `browser` or `browser-gpu` as the image profile. Prewarm removes browser startup from the first navigation. It does not reduce page network time, authentication time, or application rendering time.
 
 For GPU tests, read `/v1/browser/status`. A Modal GPU allocation alone does not prove hardware browser rendering.
-
-## The observed step latency differs from 47.10 ms
-
-The article added separate 37.25 ms screenshot and 9.85 ms click medians. The dated Computer Step
-benchmark measured the fused path at 44.29 ms p50 and 52.57 ms p95 in its fixed topology. Results
-for another region, Image, resource shape, or workload require a new measurement.
 
 ## A warm-pool candidate expired
 

@@ -1,17 +1,17 @@
 ---
 sidebarTitle: "Configuration"
 title: "Configuration reference"
-description: "Configure Modal orchestration with ComputerConfig and a direct daemon with environment variables."
+description: "Configure Modal orchestration with ComputerConfig and configure a direct daemon with environment variables."
 ---
 
-The package has two configuration surfaces:
+Version 1.1.0 has two configuration surfaces.
 
 - `ComputerConfig` configures SDK-created Modal Sandboxes.
-- Environment variables configure a directly launched daemon.
+- Environment variables configure the daemon process.
 
-`ComputerConfig` rejects unknown keys. It uses Pydantic defaults unless you provide a value.
+`ComputerConfig` does not read a config file or process environment. Pydantic defaults apply first. Explicit model values replace those defaults.
 
-## Configure the placed path
+## Public SDK model
 
 ```python
 from modal_computer_use import (
@@ -23,41 +23,32 @@ from modal_computer_use import (
 )
 
 config = ComputerConfig(
-    runtime=RuntimeConfig(
-        modal_environment="main",
-        modal_region="us-west-2",
-    ),
-    resources=ResourceConfig(
-        profile="browser",
-        cpu=1,
-        memory_mib=2048,
-    ),
+    runtime=RuntimeConfig(modal_region="us-west-2"),
+    resources=ResourceConfig(cpu=1, memory_mib=2048),
     browser=BrowserConfig(kind="chromium", prewarm=True),
     actions=ActionConfig(
-        screenshot_capture_source="mss",
         input_backend="auto",
         subprocess_backend="isolated-asyncio",
     ),
 )
 ```
 
-Replace the environment, exact region, CPU, memory, browser, and timeouts with values measured for your workload. Warm capacity stays off until you enable it in Modal.
-
-## Public models
+All configuration models reject unknown keys.
 
 | Model | Owns |
 | --- | --- |
 | `DesktopConfig` | Resolution, DPI, window manager, and display depth |
-| `RuntimeConfig` | Timeouts, Modal environment, and exact region |
-| `ResourceConfig` | Resource profile, CPU, memory, and GPU requests |
+| `RuntimeConfig` | Sandbox timeout, idle timeout, readiness timeout, Modal environment, and requested region |
+| `ResourceConfig` | Image profile, CPU, memory, and GPU requests |
 | `ImageConfig` | Inline or named image selection and revision |
-| `NetworkConfig` | Network policy and daemon HTTP version |
+| `NetworkConfig` | Network policy, daemon HTTP version, and allowlists |
 | `StorageConfig` | Artifact, recording, trace, and persistence paths |
-| `BrowserConfig` | Browser kind, prewarm, profile, startup URL, arguments, and GPU mode |
-| `ActionConfig` | Batches, timeouts, capture, input, subprocesses, and input-work limits |
-| `BudgetConfig` | Trajectory action, screenshot, artifact, recording, and idle budgets |
+| `BrowserConfig` | Browser kind, prewarm, profile, startup URL, launch arguments, and GPU mode |
+| `ActionConfig` | Pacing, traces, batch limits, timeouts, input rate, input backend, and subprocess backend |
+| `BudgetConfig` | Action, screenshot, artifact, recording, and idle budgets |
+| `ComputerConfig` | The nested models, ingress, run identity, and VNC policy |
 
-See the [2.0 configuration source](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/src/modal_computer_use/config.py) for every field and bound.
+See the [v1.1.0 configuration source](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/src/modal_computer_use/config.py) for field signatures.
 
 ## Important defaults
 
@@ -68,46 +59,53 @@ See the [2.0 configuration source](https://github.com/ashtonchew/modal-computer-
 | Readiness timeout | `120` seconds |
 | Resource profile | `standard` |
 | Image source | `inline` |
-| Ingress | `attested-tunnel` |
 | Daemon HTTP version | `1.1` |
+| Ingress | `attested-tunnel` |
+| Browser | Not selected |
 | Maximum batch actions | `50` |
 | Default action timeout | `5000` ms |
-| Input-work refill | `100` weighted tokens per second |
-| Input-work burst | `400` weighted tokens |
-| Screenshot source | `mss` |
+| Maximum action timeout | `300000` ms |
+| Input rate limit | `20` actions per second |
 | Input backend | `auto` |
 | Subprocess backend | `isolated-asyncio` |
 | VNC mode | `off` |
 
-CPU and memory values are requests. Modal billing can use the requested amount when it exceeds actual use.
+Resource values are requests, not caps. Modal can bill the request when it exceeds actual use.
 
-## Select a screenshot source
+## Configuration ownership
 
-| Value | Behavior |
-| --- | --- |
-| `mss` | Production default with persistent MSS and XShm capture when available |
-| `auto` | Evaluates the optional native X11 shared-memory extension, then uses the bounded MSS policy |
-| `x11-shm` | Requires the native extension and fails readiness when it cannot provide the source |
+The SDK passes orchestration fields directly to Modal. It maps daemon-owned settings to `COMPUTER_USE_*` environment variables.
 
-The X11 shared-memory source is an explicit option. MSS remains the production default because the
-X11 shared-memory campaign failed required promotion gates.
+The explicit `image=` argument to `ComputerSandbox.create()` replaces SDK image selection. The explicit `expose_vnc=` argument replaces `config.expose_vnc`.
 
-## Configure a direct daemon
+Do not set SDK-generated proof or transport variables yourself. For example, the SDK computes whether a Modal Volume covers the artifact path.
 
-A directly launched daemon reads `COMPUTER_USE_*` variables when it starts. Common groups include:
+## Direct daemon settings
+
+A directly launched daemon reads its process environment when it constructs `DaemonSettings`. There is no daemon config file.
+
+Common groups include:
 
 | Group | Examples |
 | --- | --- |
-| Display and backends | `DISPLAY`, `COMPUTER_USE_BACKEND`, `COMPUTER_USE_INPUT_BACKEND` |
-| Capture | `COMPUTER_USE_SCREENSHOT_CAPTURE_SOURCE` |
-| Input-work policy | `COMPUTER_USE_INPUT_RATE_LIMIT_PER_SEC`, `COMPUTER_USE_INPUT_RATE_LIMIT_BURST` |
-| Actions | `COMPUTER_USE_MAX_BATCH_ACTIONS`, `COMPUTER_USE_MAX_BATCH_DURATION_MS` |
+| Process and display | `COMPUTER_USE_DAEMON_HOST`, `COMPUTER_USE_DAEMON_PORT`, `DISPLAY` |
+| Desktop behavior | `COMPUTER_USE_BACKEND`, `COMPUTER_USE_INPUT_BACKEND`, `COMPUTER_USE_SUBPROCESS_BACKEND` |
+| Action limits | `COMPUTER_USE_MAX_BATCH_ACTIONS`, `COMPUTER_USE_MAX_BATCH_DURATION_MS` |
+| Transport bounds | `COMPUTER_USE_MAX_JSON_BODY_BYTES`, `COMPUTER_USE_MAX_WEBSOCKET_MESSAGE_BYTES` |
 | Authentication | `COMPUTER_USE_LOCAL_TOKEN`, `COMPUTER_USE_TUNNEL_TOKEN` |
 | Storage | `COMPUTER_USE_ARTIFACTS_DIR`, `COMPUTER_USE_RECORDINGS_DIR`, `COMPUTER_USE_TRACE_DIR` |
 | Budgets | `COMPUTER_USE_MAX_ACTIONS`, `COMPUTER_USE_MAX_SCREENSHOTS`, `COMPUTER_USE_MAX_IDLE_SECONDS` |
+| Observability | `COMPUTER_USE_OTEL_ENABLED` |
 
-The [application configuration guide](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/configuration.md) lists every environment variable and bound.
+See the [canonical configuration guide](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/configuration.md) for the complete v1.1.0 environment list and bounds.
 
-## Protect secrets
+## Secret handling
 
-Treat tokens, VNC passwords, daemon URLs, browser startup URLs, typed text, clipboard text, screenshots, and artifact bytes as secrets. Keep them out of configuration output and logs.
+Treat these values as secrets:
+
+- Bearer and tunnel tokens
+- VNC passwords
+- Daemon and noVNC URLs
+- Browser startup URLs
+
+Do not commit them. Do not include them in logs. Keep query credentials disabled.

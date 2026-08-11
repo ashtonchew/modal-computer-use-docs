@@ -4,8 +4,7 @@ sidebarTitle: "Warm capacity"
 description: "Fill and claim a bounded pool of ready Modal desktop Sandboxes."
 ---
 
-A warm pool reduces the wait for a ready desktop. Warm action latency uses a separate path, and the
-optimized-path contract leaves warm capacity off by default.
+A warm pool reduces the wait for a ready desktop. It does not reduce warm action latency.
 
 Function warm capacity and desktop warm capacity are separate. A warm Function reduces Function startup. A desktop pool reduces Sandbox startup.
 
@@ -45,9 +44,6 @@ policy = WarmPoolPolicy(
 ```
 
 Use a region selector from a current measurement. The pool checks configuration identity before it counts or claims a slot.
-
-The CPU, memory, browser, and capacity values above are example application choices. Select and
-record values for your workload.
 
 ## Fill the pool
 
@@ -91,4 +87,4 @@ Run `reconcile_warm_pool()` from your operator process. It removes invalid, inco
 
 Queue entries can outlive a terminated slot. Claim validation rejects stale entries.
 
-Use the [warm-pool example](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/examples/04_warm_pool.py) when startup latency justifies reserved capacity. Filled slots can remain billable while idle. Each claim is one-shot.
+Use the [warm-pool example](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/04_warm_pool.py) when startup latency justifies reserved capacity. Filled slots can remain billable while idle. Each claim is one-shot.

@@ -1,17 +1,57 @@
 ---
 sidebarTitle: "Namespaces"
 title: "Namespace reference"
-description: "Find the 2.0 Python methods for Step, input, screenshots, artifacts, and daemon capabilities."
+description: "Find the v1.1.0 Python methods for mouse, keyboard, screenshots, actions, artifacts, and other daemon capabilities."
 ---
 
-Sync and async clients use the same method names and result models. Add `await` when you use an async client.
+`ComputerSandbox`, `AsyncComputerSandbox`, `DaemonClient`, and `AsyncDaemonClient` expose the same typed namespace layout. Use the listed method without `await` on a sync client. Use `await` on an async client.
 
-## Run an action-to-observation step
+## Desktop input and capture
 
-Borrowed clients expose the stable model-loop method directly:
+| Namespace | Methods | Purpose |
+| --- | --- | --- |
+| `mouse` | `click`, `move`, `drag`, `scroll`, `down`, `up`, `position` | Control the pointer and read its position. |
+| `keyboard` | `type`, `press`, `hotkey`, `hold`, `supported_keys` | Enter text and key input. |
+| `clipboard` | `get_text`, `set_text`, `clear` | Read and change clipboard text. |
+| `screenshots` | `full`, `full_bytes`, `region`, `region_bytes`, `zoom`, `zoom_bytes`, `zoom_around` | Capture typed screenshots or raw bytes. |
+| `input` | `release_all` | Release held keys and mouse buttons. |
 
 ```python
-step = await computer.step(
+computer.mouse.click(320, 240)
+computer.keyboard.type("hello", method="keystrokes")
+frame = computer.screenshots.full(show_cursor=True)
+```
+
+## Desktop state
+
+| Namespace | Methods | Purpose |
+| --- | --- | --- |
+| `display` | `info` | Read display geometry and metadata. |
+| `windows` | `list`, `active`, `activate`, `close`, `wait_for` | Inspect and control X11 windows. |
+| `browser` | `open_url`, `status`, `render_metrics` | Control and inspect the configured browser. |
+| `apps` | `launch`, `open_artifact` | Start an application or open a stored artifact. |
+| `commands` | `run` | Run an explicit command vector. |
+
+`commands.run()` does not invoke a shell unless you request one in the command vector.
+
+```python
+result = computer.commands.run("sh", "-c", "printf '42\\n'")
+```
+
+## Ordered actions
+
+| Method | Purpose |
+| --- | --- |
+| `actions.apply` | Apply one action. |
+| `actions.run` | Run an ordered action batch. |
+| `actions.validate` | Validate actions without execution. |
+| `actions.run_and_screenshot_bytes` | Run a batch and return the trailing raw screenshot. |
+| `actions.run_and_observe_change_screenshot_bytes` | Run a batch and return the experimental changed-frame capture. |
+
+Use `actions.run()` when order matters. The whole-batch deadline stops the batch even when `continue_on_error=True`.
+
+```python
+result = computer.actions.run(
     [
         {"type": "move", "x": 100, "y": 120},
         {"type": "click", "button": "left"},
@@ -20,60 +60,28 @@ step = await computer.step(
 )
 ```
 
-`step.actions` contains the ordered batch result. `step.screenshot` contains the immediate post-action frame. `step.timing` contains daemon timing.
-
-## Desktop input and capture
-
-| Namespace | Methods | Purpose |
-| --- | --- | --- |
-| `mouse` | `click`, `move`, `drag`, `scroll`, `down`, `up`, `position` | Control and inspect the pointer |
-| `keyboard` | `type`, `press`, `hotkey`, `hold`, `supported_keys` | Enter text and key input |
-| `clipboard` | `get_text`, `set_text`, `clear` | Read and change clipboard text |
-| `screenshots` | `full`, `full_bytes`, `region`, `region_bytes`, `zoom`, `zoom_bytes`, `zoom_around` | Capture semantic screenshots or raw bytes |
-| `input` | `release_all` | Release held keys and mouse buttons |
-
-The default inline `screenshots.full()` request uses the raw binary route and returns a byte-backed `Screenshot`. JSON and base64 routes remain available for direct REST and artifact storage.
-
-## Ordered action primitives
-
-| Method | Purpose |
-| --- | --- |
-| `actions.apply` | Apply one action |
-| `actions.run` | Run one validated ordered batch without a trailing frame |
-| `actions.validate` | Validate actions without mutation |
-| `actions.run_and_screenshot_bytes` | Compatibility byte result for an action batch and trailing frame |
-| `actions.run_and_observe_change_screenshot_bytes` | Experimental first-visual-change observation |
-
-Use `computer.step()` in provider loops. Use `actions.run()` when the next observation is unnecessary.
-
-## Desktop state
-
-| Namespace | Methods | Purpose |
-| --- | --- | --- |
-| `display` | `info` | Read display geometry and metadata |
-| `windows` | `list`, `active`, `activate`, `close`, `wait_for` | Inspect and control X11 windows |
-| `browser` | `open_url`, `status`, `render_metrics` | Control the configured browser |
-| `apps` | `launch`, `open_artifact` | Start an application or open an artifact |
-| `commands` | `run` | Run an explicit command vector |
-
-`commands.run()` does not invoke a shell unless the command vector requests one.
-
 ## Artifacts and recordings
 
 | Namespace | Methods | Purpose |
 | --- | --- | --- |
-| `artifacts` | `list`, `read_bytes`, `write_bytes`, `download`, `upload`, `delete`, `manifest`, `sync` | Store files below the artifact root |
-| `recordings` | `start`, `stop`, `list`, `get`, `download`, `delete` | Manage screen recordings |
+| `artifacts` | `list`, `read_bytes`, `write_bytes`, `download`, `upload`, `delete`, `manifest`, `sync` | Store and transfer files below the configured artifact root. |
+| `recordings` | `start`, `stop`, `list`, `get`, `download`, `delete` | Manage screen recordings. |
 
-Artifact paths reject traversal and symlink escapes.
+Artifact paths reject traversal and symlink escapes. `artifacts.sync()` reports whether configured persistence completed.
 
 ## Runtime and diagnostics
 
 | Namespace | Methods | Purpose |
 | --- | --- | --- |
-| `lifecycle` | `start`, `stop`, `restart`, `status` | Control the desktop stack |
-| `processes` | `status`, `restart`, `logs`, `stderr`, `errors` | Inspect supervised processes |
-| `session` | `metadata`, `refresh`, `tunnel_authorize` | Read and refresh session access |
-| `debug` | `urls`, `vnc_url` | Request explicit debug URLs |
+| `lifecycle` | `start`, `stop`, `restart`, `status` | Control the daemon desktop stack. |
+| `processes` | `status`, `restart`, `logs`, `stderr`, `errors` | Inspect supervised desktop processes. |
+| `session` | `metadata`, `refresh`, `tunnel_authorize` | Read session metadata and refresh session access. |
+| `debug` | `urls`, `vnc_url` | Request explicit debug URLs. |
 
-Treat debug URLs as secrets. See [errors and models](/reference/errors-and-models) for result and recovery types.
+Treat debug URLs as secrets. For Modal-created Sandboxes, prefer `ComputerSandbox.debug_urls()` when you need Modal-owned noVNC information.
+
+## Return values and failures
+
+Namespace methods return typed models such as `ActionResult`, `Screenshot`, `Recording`, `ArtifactInfo`, `ProcessStatus`, and `SandboxRef`.
+
+See [errors and models](/reference/errors-and-models) for the stable top-level types. See [OpenAPI](/reference/openapi) for the matching HTTP routes.

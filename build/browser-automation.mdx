@@ -1,75 +1,80 @@
 ---
-title: "Configure browser automation"
+title: "Automate a browser"
 sidebarTitle: "Browser automation"
-description: "Choose a browser, Image source, prewarm policy, and resources."
+description: "Configure Chromium or Firefox in a Modal desktop and open a page."
 ---
 
-## Configure the browser explicitly
+Choose a browser image profile when the desktop needs Chromium or Firefox.
+
+## Configure Chromium
 
 ```python
-from modal_computer_use import ComputerConfig
+from modal_computer_use import (
+    BrowserConfig,
+    ComputerConfig,
+    ComputerSandbox,
+    ResourceConfig,
+)
 
 config = ComputerConfig(
-    resources={"profile": "browser", "cpu": 1.0, "memory_mib": 2048},
-    image={"source": "inline"},
-    browser={
-        "kind": "chromium",
-        "prewarm": False,
-        "gpu_mode": "off",
-    },
+    resources=ResourceConfig(profile="browser"),
+    browser=BrowserConfig(kind="chromium"),
+)
+
+with ComputerSandbox.create(config=config) as computer:
+    result = computer.browser.open_url("https://example.com")
+    if not result.ok:
+        raise RuntimeError(result.message)
+
+    screenshot = computer.screenshots.full()
+    screenshot.save("example.png")
+```
+
+Set `kind="firefox"` to use Firefox.
+
+## Prewarm the browser
+
+Set `prewarm=True` when browser startup is part of a measured bottleneck:
+
+```python
+from modal_computer_use import BrowserConfig, ComputerConfig, ResourceConfig
+
+config = ComputerConfig(
+    resources=ResourceConfig(
+        profile="browser",
+        cpu=4,
+        memory_mib=8192,
+    ),
+    browser=BrowserConfig(kind="firefox", prewarm=True),
 )
 ```
 
-Choose CPU, memory, region, and browser prewarm for your workload. Record them with each
-measurement.
+Prewarm starts the configured browser during desktop startup. It does not make a page ready for application use. Check the state that your task requires after you open the URL.
 
-## Keep the inline recipe as the default
-
-The inline recipe stays with application source and lets Modal reuse cached build layers. Managed
-release metadata is optional for this path.
-
-Use a managed Image when an operator needs a release record and an exact Modal object identity.
-Managed Image selection remains explicit.
-
-## Publish a managed Image
-
-<Warning>
-Image builds and canaries can incur Modal charges. Run publication only from a clean source revision
-after the operator approves the Environment and Image Builder Version.
-</Warning>
+## Inspect browser state
 
 ```python
-from pathlib import Path
-from modal_computer_use import ImageReleaseSpec, publish_image_release
-
-spec = ImageReleaseSpec(
-    source_revision="4cb098207053931c2e6e693ce87f7f6e16ab215a",
-    logical_release="2.0.0",
-    image_variant="standard",
-    environment_name="main",
-    manifest_path=Path("dist/image-releases/standard.json"),
-    expected_image_builder_version="2025.06",
+status = computer.browser.status()
+metrics = computer.browser.render_metrics(
+    "https://example.com",
+    timeout_seconds=30.0,
 )
-
-record = publish_image_release(spec)
+print(status)
+print(metrics)
 ```
 
-The workflow uses the frozen runtime `pyproject.toml` and `uv.lock`. It builds the Image, runs the
-protected canary, publishes the revision tag, and records the exact object ID. An interrupted run
-can resume from its pending manifest. Identity conflicts fail closed.
+`status()` returns daemon browser state. `render_metrics()` opens the URL and returns the measured browser result. Render metrics require Chromium in version 1.1.0.
 
-## Resolve the exact Image
+## Use desktop primitives
+
+The browser namespace handles browser lifecycle operations. Use the normal input and observation namespaces for page interaction:
 
 ```python
-from modal_computer_use import resolve_release_image
-
-image = resolve_release_image(record)
+computer.mouse.click(320, 240)
+computer.keyboard.hotkey("CTRL", "L")
+computer.keyboard.type("https://example.com")
+computer.keyboard.press("ENTER")
+screenshot = computer.screenshots.full(show_cursor=True)
 ```
 
-The release record binds the mutable name and tag to an Environment, exact Modal object ID, source
-revision, lock hashes, builder version, canary result, and publication time.
-
-The standard lifecycle benchmark measured 60 successful lifecycles and 60 successful cleanups. The
-managed arm improved p50 by 8.95% and p95 by 3.15% for the tested setup. The paired mean interval
-crossed zero. Read the [current results](/benchmarks/current-results) before applying the result to
-another variant, region, or resource shape.
+Keep provider model loops in your application. Modal Computer Use provides provider adapters, but the core package does not call model APIs.

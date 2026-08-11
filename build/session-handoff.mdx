@@ -1,52 +1,108 @@
 ---
 title: "Hand a desktop to a Modal Function"
 sidebarTitle: "Session handoff"
-description: "Pass a versioned session handle to one explicitly placed Function."
+description: "Borrow an existing desktop for one deployed Modal Function trajectory."
 ---
 
-## Follow one ownership sequence
+Use a session handoff when a deployed Modal Function runs the complete screenshot, model, and action loop. The owner process keeps lifecycle ownership of the desktop.
 
-1. Enter `AsyncComputerSandbox.create()` once.
-2. Wait for desktop readiness.
-3. Call `owner.session_handle()` once.
-4. Send the handle to one deployed Function.
-5. Enter `handle.borrow_async()` once inside that Function.
-6. Run the complete model trajectory.
-7. Release the lease.
-8. Let the owner terminate the desktop.
+## Understand the ownership pattern
 
-The handle carries versioned routing identity. Borrow entry resolves fresh access and verifies the
-live target.
+1. Your application creates the desktop.
+2. The owner calls `session_handle()`.
+3. The owner passes the handle to a deployed Modal Function.
+4. The Function enters one `borrow_async()` context for the complete trajectory.
+5. The Function detaches when the borrow ends.
+6. The owner terminates the desktop after the Function reaches a terminal result.
 
-## Require exact placement
+The handle contains routing identity. It is not a bearer credential. Do not log or publish it.
 
-Set the same exact region on the owner configuration and Function decorator. Pass that value to
-`borrow_async(function_region=...)`.
-
-Missing, broad, mismatched, malformed, or unverifiable placement fails before mutation. The caller
-must establish the placed Function topology explicitly.
-
-## Keep one borrow
+## Define the deployed Function
 
 ```python
-async with handle.borrow_async(run_id=run_id, function_region=REGION) as computer:
-    screenshot = await computer.screenshots.full()
-    while model_has_actions:
-        actions = await application_model_call(screenshot)
-        step = await computer.step(actions)
-        screenshot = step.screenshot
+import modal
+
+from modal_computer_use import ComputerSessionHandle
+
+function_region = "us-west"
+app = modal.App("computer-use-function-handoff")
+image = modal.Image.debian_slim().pip_install("modal-computer-use[modal]")
+
+
+@app.function(
+    image=image,
+    region=function_region,
+    retries=0,
+    min_containers=0,
+    max_containers=4,
+    timeout=900,
+)
+async def run_trajectory(
+    handle: ComputerSessionHandle,
+    task: str,
+    run_id: str,
+) -> dict[str, str]:
+    async with handle.borrow_async(
+        run_id=run_id,
+        function_region=function_region,
+    ) as computer:
+        for _ in range(3):
+            screenshot = await computer.screenshots.full()
+            action = await application_model_call(task, screenshot)
+            await computer.actions.run([action])
+    return {"status": "succeeded"}
 ```
 
-The borrow reuses one lease, pooled HTTP client, and attested authentication state. Requests still
-cross authenticated Modal ingress.
+Replace `application_model_call()` with your application code. Use an async provider client so the Function event loop remains available.
 
-## Handle cancellation and result loss
+Set the same explicit region on the desktop configuration and the Function. The borrow checks `function_region` against the requested desktop region.
 
-Keep the owner open until a remote or spawned Function call reaches a terminal outcome. Function
-cancellation leaves the desktop and earlier input intact for explicit recovery.
+## Deploy the Function
 
-When mutation completed but its result was lost, use the explicit observation and receipt recovery
-interfaces. Never repeat the action automatically.
+```bash
+uv run modal deploy path/to/handoff_app.py
+```
 
-Native async provisioning keeps cleanup cancellation-safe. Cold allocation and desktop startup
-retain their normal Modal timing.
+The deployed Function image must include `modal-computer-use[modal]`. The Function must have access to the Modal environment that owns the Sandbox.
+
+## Invoke the Function from the owner
+
+```python
+import uuid
+
+import modal
+
+from modal_computer_use import ComputerConfig, ComputerSandbox
+
+function_region = "us-west"
+app_name = "computer-use-function-handoff"
+deployed = modal.Function.from_name(app_name, "run_trajectory")
+
+config = ComputerConfig(
+    ingress="attested-tunnel",
+    runtime={
+        "modal_environment": "main",
+        "modal_region": function_region,
+    },
+)
+
+with ComputerSandbox.create(config=config, app_name=app_name) as owner:
+    handle = owner.session_handle()
+    run_id = f"trajectory_{uuid.uuid4().hex}"
+    result = deployed.remote(handle, "replace with your task", run_id)
+    print(result["status"])
+```
+
+Use one new `run_id` for each trajectory. Do not reuse a durably sealed run ID.
+
+## Keep one trajectory per desktop
+
+The borrow takes an exclusive daemon trajectory lease. Concurrent work must use separate desktop handles.
+
+The Function leaves the desktop running when the borrow ends. Only the original owner terminates it.
+
+<Warning>
+  A cancelled Function invocation does not reverse desktop effects that already occurred. Your application must reconcile an ambiguous result before it starts a new trajectory.
+</Warning>
+
+Use the [session handoff example](https://github.com/ashtonchew/modal-computer-use/blob/main/examples/modal_function_session_handoff.py) when a Modal Function needs one complete stateful trajectory. It shows dispatch, cancellation, and observation after result loss. The owner must reconcile an ambiguous outcome before it starts another trajectory.

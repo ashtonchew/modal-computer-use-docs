@@ -1,55 +1,52 @@
 ---
 sidebarTitle: "Reproducibility"
 title: "Reproduce a benchmark"
-description: "Verify tracked evidence and publish a new dated result."
+description: "Follow the canonical procedure and verify tracked Modal Computer Use benchmark evidence."
 ---
 
-The application repository owns benchmark procedures and artifacts. Use this sequence for a new result.
+The application repository owns the benchmark procedure and evidence policy. This page gives you the shortest path to those sources.
 
-## 1. Read the procedure
+## 1. Open the canonical procedure
 
-Open the [canonical benchmark guide](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmarking.md). Select the benchmark that matches your question.
+Read the [benchmark procedure](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmarking.md) before you run a benchmark.
 
-## 2. Freeze the source
+It defines the timer boundaries, source-state rules, sample handling, sanitization, cost controls, cleanup checks, and publication gate.
 
-```bash
-source_sha="$(git rev-parse HEAD)"
-test -z "$(git status --porcelain)"
-```
+## 2. Select the evidence class
 
-Record the full source SHA. Branch names move and cannot bind evidence.
+Use the [benchmark data policy](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/README.md) to select an artifact type and storage location.
 
-## 3. Preregister the run
+Keep raw output in the ignored `benchmark-results/` directory. Promote only the sanitized artifact that the procedure permits.
 
-Record:
+## 3. Run the benchmark
 
-- Arms and interleaving schedule
-- Exact topology, placement, resources, Image, ingress, HTTP version, and backends
-- Warmup and measured sample counts
-- Timer boundaries and required attribution
-- Failure, cleanup, and promotion rules
-- Cost ceiling and authorization
+Use the command for your measurement question. The [run benchmarks](./run) page lists the current commands.
 
-## 4. Run once and retain failures
+Record the exact source and harness revisions. Do not cite a branch name as evidence.
 
-Use the command listed on [Run benchmarks](/benchmarks/run). Keep retries and replacement samples at zero unless the preregistration explicitly studies them. Preserve partial and rejected artifacts.
+## 4. Verify the result
 
-## 5. Validate the artifact
-
-Run the benchmark-specific validator and the repository checks:
+Run the focused evidence tests.
 
 ```bash
 uv run pytest tests/benchmarks
+```
+
+Run the full repository gate before you publish a report.
+
+```bash
 uv run ruff check .
 uv run mypy src
 uv run pytest
 uv run python scripts/export_openapi.py --check
 ```
 
-## 6. Publish a dated report
+The [July 30 report](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmark-results-2026-07-30-warm-paths.md) shows how a report binds its source revisions and input artifacts.
 
-Pin links to full commit SHAs. Include configuration, sample counts, failures, cleanup, statistics, and limits. Keep raw secrets and resource identifiers in a private archive.
+## 5. Cite tracked evidence
+
+Link each claim to the exact application commit that contains its report or artifact. State any limit that prevents independent recalculation.
 
 <Note>
-The hosted site explains the evidence. The application repository remains the source for benchmark code, policy, reports, and sanitized artifacts.
+The documentation site explains how to find and read the evidence. The application repository remains the only source for benchmark rules, reports, and artifacts.
 </Note>
