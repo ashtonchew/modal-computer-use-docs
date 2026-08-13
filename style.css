@@ -47,3 +47,9 @@
     grid-column: 1;
   }
 }
+
+/* Keep the three-column action-to-frame table visible at narrow widths and high zoom. */
+.action-frame-results th,
+.action-frame-results td {
+  min-width: 0 !important;
+}

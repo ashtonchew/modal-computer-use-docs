@@ -1,40 +1,54 @@
 ---
 sidebarTitle: "Latency evidence"
 title: "Latency evidence"
-description: "Map each performance claim to the evidence that supports it."
+description: "Map each performance claim to its status, measurement boundary, and proof."
 ---
 
-Use the narrowest artifact that answers your question.
+Use this page to trace a performance claim to its narrowest source. Current results contains eligible measurements. This page also records dated, experimental, candidate, estimated, rejected, and unverified evidence.
 
-## Evidence map
+## Current product evidence
 
-| Question | Primary evidence | Boundary |
-| --- | --- | --- |
-| Fused action-to-frame latency | [Computer Step report](https://github.com/ashtonchew/modal-computer-use/blob/f6b9adeee54f584c345c813750758b7c7b5db744/docs/benchmark-results-2026-08-08-computer-step.md) | 100 same-topology interleaved pairs per arm |
-| Raw binary screenshot default | [Optimized-default report](https://github.com/ashtonchew/modal-computer-use/blob/31bcafefbba2ba75653075a04b12ce2eb816c838/docs/benchmark-results-2026-08-08-optimized-default.md) | 30 same-topology interleaved samples per arm |
-| Weighted input-work default | [Input-capacity report](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmark-results-2026-08-08-input-capacity.md) | Three independent mixed XTest gates |
-| Managed standard Image lifecycle | [Image lifecycle report](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmark-results-2026-08-08-image-lifecycle.md) | 30 paired lifecycles per arm |
-| Ordered batching | [Batching replication](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-action-batching-ab-replication-2026-08-02.json) | 30 samples per arm |
-| Native XTest direction | [X11 replication](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-native-x11-backend-ab-replication-2026-08-02.json) | 30 matching Connect samples per arm |
+| Claim | Status | Measurement boundary | Proof |
+| --- | --- | --- | --- |
+| Complete action-to-frame paths | Eligible | One click at `(512, 384)` through the next decoded and validated full screenshot; 100 measured samples per path | [Report](https://github.com/ashtonchew/modal-computer-use/blob/46065138902e17d2525b8a76573c4d3811064462/docs/benchmark-results-2026-08-11-provider-action-frame.md) and [artifact](https://github.com/ashtonchew/modal-computer-use/blob/46065138902e17d2525b8a76573c4d3811064462/benchmark-data/external-provider-action-frame-2026-08-11.json) |
+| Same-topology Computer Step | Eligible | 100 interleaved pairs per arm through the decoded immediate frame | [Computer Step report](https://github.com/ashtonchew/modal-computer-use/blob/f6b9adeee54f584c345c813750758b7c7b5db744/docs/benchmark-results-2026-08-08-computer-step.md) |
+| Raw binary screenshot default | Eligible | 30 interleaved samples per arm across screenshot and pointer move | [Optimized-default report](https://github.com/ashtonchew/modal-computer-use/blob/31bcafefbba2ba75653075a04b12ce2eb816c838/docs/benchmark-results-2026-08-08-optimized-default.md) |
+| Weighted input-work default | Eligible | Three independent mixed XTest capacity gates | [Input-capacity report](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmark-results-2026-08-08-input-capacity.md) |
+| Managed standard Image lifecycle | Eligible | 30 paired lifecycles per arm | [Image lifecycle report](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmark-results-2026-08-08-image-lifecycle.md) |
 
-## Keep latency terms separate
+## Article performance claims
+
+| Claim | Status | Measurement boundary | Proof |
+| --- | --- | --- | --- |
+| Warm screenshots, clicks, typing, and commands | Historical | 30 successful warm samples per path and case after target and client readiness | [Warm-path report](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmark-results-2026-07-30-warm-paths.md) |
+| Ordered action batching | Replication | 30 samples per arm for one ordered batch and four separate action requests | [Batching replication](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-action-batching-ab-replication-2026-08-02.json) |
+| Native XTest input direction | Replication | 30 matching Connect samples per arm | [X11 replication](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-native-x11-backend-ab-replication-2026-08-02.json) |
+| First changed frame | Experimental | Action completion through the first verified pixel change | [Observation artifact](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-observation-2026-07-30.json) |
+| Caller placement | Candidate | External caller and placed Modal Function against a requested `us-west-2` target | [Caller-placement artifact](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-caller-placement-us-west-2-2026-07-31.json) |
+| Command-runner tail | Candidate | 30 measured samples and one warmup per runner arm | [Subprocess-runner artifact](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-subprocess-runner-ab-2026-07-30.json) |
+| Fresh create to first validated screenshot | Unverified | Public create call through the first decoded and validated full screenshot | [Tracking issue](https://github.com/ashtonchew/modal-computer-use/issues/252) |
+| Warm runtime cost | Estimate | Recorded resource duration combined with list prices | [Cost estimate](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-optimized-provider-cost-estimate-2026-07-30.json) |
+| Matched-configuration provider comparison | Unverified | Requires matched caller placement, region, resources, screenshot format, and request shape | [Tracking issue](https://github.com/ashtonchew/modal-computer-use/issues/251) |
+
+The dated warm-path report also supports the article's separate-operation arithmetic. Keep that explanation with the dated evidence.
+
+## Latency terms
 
 | Term | Starts | Ends |
 | --- | --- | --- |
 | Cold allocation | Before Sandbox creation | Modal allocates the Sandbox |
 | Startup | After allocation | Daemon, desktop, auth, and required readiness complete |
 | Borrow | Before lease setup | Placed client and lease are ready |
-| Action to immediate frame | Before Step request | Valid Step result is decoded |
-| First visual change | After action | Pixel verification confirms a changed frame or times out |
+| Complete action-to-frame path | Immediately before ordered action dispatch | The next full screenshot is decoded and validated |
+| First visual change | After action completion | Pixel verification confirms a changed frame or times out |
 | Application readiness | Application-defined | Application-defined |
 
-The stable Step contract ends at the immediate frame. First visual change is experimental. Application readiness needs an application-specific signal.
+The stable Step contract ends at the immediate frame. First visual change remains experimental. Application readiness uses an application-specific signal.
 
 ## X11 shared-memory evidence
 
-MSS remains the production screenshot source. The optional X11 shared-memory source failed its fixed promotion gate because repeated readiness measurements included capture timeouts. Keep rejected artifacts and timeout attribution with any future rerun. A short operational green run cannot replace a full promotion result.
+MSS remains the production screenshot source. The optional X11 shared-memory source failed its fixed promotion gate because repeated readiness measurements included capture timeouts. Keep rejected artifacts and timeout attribution with any future rerun. Promotion still requires a full passing result.
 
 ## Cost evidence
 
-Cost estimates use recorded resource duration and list rates. Invoice reconciliation requires any
-unmeasured image builds, storage, network, model usage, plan fees, credits, and taxes.
+Cost estimates use recorded resource duration and list rates. A complete invoice comparison must also account for image builds, storage, network, model usage, plan fees, credits, and taxes.

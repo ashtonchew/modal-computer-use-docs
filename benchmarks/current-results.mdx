@@ -1,23 +1,25 @@
 ---
 sidebarTitle: "Current results"
 title: "Current benchmark results"
-description: "Review current dated benchmark results and their measurement boundaries."
+description: "Review eligible measurements and the scope of each result."
 ---
 
-These reports use separate experiments and scopes. Compare values only within the matched arms described by each report.
+Each section states what it measures and links its evidence. Read each result within the scope defined by its report.
 
 ## Computer Step
 
-The 8 August 2026 promotion run measured one ordered action batch and its immediate screenshot as one fused HTTP operation.
+The 8 August 2026 promotion run compared two ways to execute one ordered action batch and capture its immediate screenshot within the same topology.
 
 | Same-topology arm | p50 | p95 |
 | --- | ---: | ---: |
 | `actions.run()` then `screenshots.full()` | 47.14 ms | 58.22 ms |
-| `computer.step()` | **44.29 ms** | **52.57 ms** |
+| `computer.step()` | 44.29 ms | 52.57 ms |
 
-The run retained 100 interleaved pairs per arm. It recorded zero failures, retries, replacements, and cleanup survivors. The source was [`f6b9adeee54f584c345c813750758b7c7b5db744`](https://github.com/ashtonchew/modal-computer-use/blob/f6b9adeee54f584c345c813750758b7c7b5db744/docs/benchmark-results-2026-08-08-computer-step.md).
+The run retained 100 interleaved pairs per arm. It recorded zero failures, retries, replacements, and cleanup survivors.
 
-The Step frame is immediate. Changed pixels and application readiness use separate timers.
+Evidence: [Computer Step report](https://github.com/ashtonchew/modal-computer-use/blob/f6b9adeee54f584c345c813750758b7c7b5db744/docs/benchmark-results-2026-08-08-computer-step.md)
+
+An immediate frame completes this timer. First visual change and application readiness use separate signals.
 
 ## Raw binary screenshot default
 
@@ -26,11 +28,13 @@ The optimized-default gate measured a full semantic screenshot followed by one p
 | Same-topology arm | p50 | p95 |
 | --- | ---: | ---: |
 | Retained JSON/base64 screenshot path | 147.27 ms | 763.47 ms |
-| Raw binary screenshot with `Screenshot` reconstruction | **81.11 ms** | **739.17 ms** |
+| Raw binary screenshot with `Screenshot` reconstruction | 81.11 ms | 739.17 ms |
 
-Both arms retained 30 interleaved samples. The source was [`31bcafefbba2ba75653075a04b12ce2eb816c838`](https://github.com/ashtonchew/modal-computer-use/blob/31bcafefbba2ba75653075a04b12ce2eb816c838/docs/benchmark-results-2026-08-08-optimized-default.md).
+Both arms retained 30 interleaved samples.
 
-This timer used two SDK operations. The Computer Step table above contains the fused measurement.
+Evidence: [Optimized-default report](https://github.com/ashtonchew/modal-computer-use/blob/31bcafefbba2ba75653075a04b12ce2eb816c838/docs/benchmark-results-2026-08-08-optimized-default.md)
+
+This timer used two SDK operations. The Computer Step section covers the fused route.
 
 ## Input-work capacity
 
@@ -42,7 +46,9 @@ The minimum tested runtime ran three independent mixed XTest capacity gates.
 | 2 | 505.14 | 148.10 ms | 3,817,472 B |
 | 3 | 380.70 | 206.17 ms | 29,941,760 B |
 
-Each run completed 80 batches of 48 ordered actions. The product default is a 100-token refill with a 400-token burst. The [input-capacity report](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmark-results-2026-08-08-input-capacity.md) explains the two-times safety margin and weighted costs.
+Each run completed 80 batches of 48 ordered actions. The product default is a 100-token refill with a 400-token burst.
+
+Evidence: [Input-capacity report](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmark-results-2026-08-08-input-capacity.md)
 
 ## Managed Image lifecycle
 
@@ -53,10 +59,42 @@ The managed standard Image completed 60 of 60 measured lifecycles with successfu
 | p50 | 15.47 s | 14.08 s | -8.95 percent |
 | p95 | 44.68 s | 43.27 s | -3.15 percent |
 
-The paired mean confidence interval crossed zero because both arms had large tail outliers. The
-result supports an opt-in managed standard Image. A universal default needs separate availability,
-rollback, and variant evidence. See the [image lifecycle report](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmark-results-2026-08-08-image-lifecycle.md).
+The paired mean confidence interval crossed zero because both arms had large tail outliers. The result supports an opt-in managed standard Image. A universal default requires separate availability, rollback, and variant evidence.
+
+Evidence: [Image lifecycle report](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmark-results-2026-08-08-image-lifecycle.md)
+
+## Complete action-to-frame paths
+
+On 11 August 2026, the benchmark measured one left click at `(512, 384)` followed by the next validated full screenshot through four public SDK paths. It ran two warmups and 100 measured samples for each path. The timer started immediately before ordered action dispatch and ended after the next full screenshot was decoded and validated.
+
+<div className="action-frame-results">
+
+  | Path | p50 (ms) | p95 (ms) |
+  | --- | ---: | ---: |
+  | Modal Computer Use / `computer.step()` | 43.13 | 46.35 |
+  | Daytona | 1039.59 | 1143.06 |
+  | E2B | 15659.63 | 15744.76 |
+  | Tzafon | 264.37 | 346.10 |
+
+</div>
+
+The run recorded zero failures, zero harness retries, zero replacement samples, and zero cleanup survivors.
+
+These values describe complete paths under their recorded configurations. Use a matched-configuration campaign to compare provider implementations. Match caller placement, region, resources, screenshot format, and request shape.
+
+Evidence: [dated report](https://github.com/ashtonchew/modal-computer-use/blob/46065138902e17d2525b8a76573c4d3811064462/docs/benchmark-results-2026-08-11-provider-action-frame.md) and [sanitized artifact](https://github.com/ashtonchew/modal-computer-use/blob/46065138902e17d2525b8a76573c4d3811064462/benchmark-data/external-provider-action-frame-2026-08-11.json)
+
+<Accordion title="Configuration and measurement details">
+
+The recorded CPU and memory values describe each desktop target. Modal used the same resource shape for its placed caller and target. External caller capacity has no recorded value.
+
+- Modal Computer Use / `computer.step()`: `modal-computer-use` 2.0.0. Caller: application-owned Modal Function. Requested and observed region: `us-west-2`. Target and caller resources: one physical CPU and 2048 MiB each. Screenshot: PNG with dimensions unrecorded and a hidden cursor. Request shape: one SDK call and one transport request. Retry policy: no mutation retry.
+- Daytona: Daytona 0.175.0. Caller and placement: external SDK caller with provider defaults. Requested and observed region: provider default. Target resources: one physical CPU and 1024 MiB. Screenshot: 1024 x 768 PNG with an unreported cursor setting. Request shape: two SDK calls and two transport requests. Retry policy: provider default.
+- E2B: E2B Desktop 2.4.2. Caller and placement: external SDK caller with provider defaults. Requested and observed region: provider default. Target resources: two physical CPUs and 1024 MiB. Screenshot: 1024 x 768 PNG with an unreported cursor setting. Request shape: two SDK calls and three transport requests. Retry policy: provider default.
+- Tzafon: Tzafon 2.44.1. Caller and placement: external SDK caller with provider defaults. Requested and observed region: provider default. The provider did not disclose target resources. Screenshot: 1280 x 720 JPEG with an unreported cursor setting. Request shape: two SDK calls and two transport requests. Retry policy: provider default.
+
+</Accordion>
 
 ## Historical provider comparison
 
-The [30 July warm-path report](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmark-results-2026-07-30-warm-paths.md) remains historical evidence. Its provider paths used different caller placement, screenshot formats, and request shapes.
+The [30 July warm-path report](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmark-results-2026-07-30-warm-paths.md) remains dated historical evidence. It covers screenshots, clicks, ordered batches, typing, and commands. Its provider paths used different caller placement, screenshot formats, and request shapes.
