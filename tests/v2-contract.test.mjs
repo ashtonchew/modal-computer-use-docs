@@ -57,6 +57,91 @@ test("documents the placed Step path and its measurement boundary", async () => 
   assert.match(results, /47\.14 ms/);
 });
 
+test("publishes the complete action-to-frame evidence without turning it into a ranking", async () => {
+  const overview = await source("benchmarks/overview.mdx");
+  assert.match(overview, /Current results/);
+  assert.match(overview, /Latency evidence/);
+  assert.match(overview, /Run benchmarks/);
+  assert.doesNotMatch(overview, /\| Question \| Current result \|/);
+
+  const results = await source("benchmarks/current-results.mdx");
+  assert.match(results, /## Complete action-to-frame paths/);
+  assert.match(results, /one left click at `\(512, 384\)`/);
+  assert.match(results, /two warmups and 100 measured samples for each path/i);
+  assert.match(
+    results,
+    /timer started immediately before ordered action dispatch and ended after the next full screenshot was decoded and validated/i,
+  );
+  assert.match(results, /\| Path \| p50 \(ms\) \| p95 \(ms\) \|/);
+  assert.match(results, /\| Modal Computer Use \/ `computer\.step\(\)` \| 43\.13 \| 46\.35 \|/);
+  assert.match(results, /\| Daytona \| 1039\.59 \| 1143\.06 \|/);
+  assert.match(results, /\| E2B \| 15659\.63 \| 15744\.76 \|/);
+  assert.match(results, /\| Tzafon \| 264\.37 \| 346\.10 \|/);
+  assert.match(results, /<div className="action-frame-results">/);
+
+  const styles = await source("style.css");
+  assert.match(styles, /\.action-frame-results th/);
+  assert.match(styles, /\.action-frame-results td/);
+  assert.match(results, /zero failures, zero harness retries, zero replacement samples, and zero cleanup survivors/i);
+  assert.match(results, /Use a matched-configuration campaign to compare provider implementations/);
+  assert.match(results, /<Accordion title="Configuration and measurement details">/);
+  assert.match(results, /application-owned Modal Function/);
+  assert.match(results, /requested and observed region: `us-west-2`/i);
+  assert.match(results, /Daytona 0\.175\.0/);
+  assert.match(results, /E2B Desktop 2\.4\.2/);
+  assert.match(results, /Tzafon 2\.44\.1/);
+  assert.match(results, /1024 x 768 PNG/);
+  assert.match(results, /1280 x 720 JPEG/);
+  assert.match(
+    results,
+    /https:\/\/github\.com\/ashtonchew\/modal-computer-use\/blob\/46065138902e17d2525b8a76573c4d3811064462\/docs\/benchmark-results-2026-08-11-provider-action-frame\.md/,
+  );
+  assert.match(
+    results,
+    /https:\/\/github\.com\/ashtonchew\/modal-computer-use\/blob\/46065138902e17d2525b8a76573c4d3811064462\/benchmark-data\/external-provider-action-frame-2026-08-11\.json/,
+  );
+
+  const actionFrameStart = results.indexOf("## Complete action-to-frame paths");
+  const historyStart = results.indexOf("## Historical provider comparison");
+  const actionFrameSection = results.slice(actionFrameStart, historyStart);
+  assert.doesNotMatch(actionFrameSection, /\*\*(?:43\.13|46\.35|1039\.59|1143\.06|15659\.63|15744\.76|264\.37|346\.10)\*\*/);
+  assert.doesNotMatch(actionFrameSection, /winner|fastest|outperform/i);
+
+  const evidence = await source("benchmarks/latency-evidence.mdx");
+  assert.match(evidence, /\| Claim \| Status \| Measurement boundary \| Proof \|/);
+  assert.match(evidence, /Complete action-to-frame paths/);
+  assert.match(evidence, /Eligible/);
+  assert.match(evidence, /one click at `\(512, 384\)`/i);
+  assert.match(evidence, /100 measured samples per path/);
+  assert.match(evidence, /46065138902e17d2525b8a76573c4d3811064462/);
+  assert.match(evidence, /Matched-configuration provider comparison \| Unverified/);
+  assert.match(evidence, /modal-computer-use\/issues\/251/);
+  assert.match(evidence, /Fresh create to first validated screenshot \| Unverified/);
+  assert.match(evidence, /modal-computer-use\/issues\/252/);
+});
+
+test("keeps active benchmark prose direct", async () => {
+  for (const path of [
+    "benchmarks/overview.mdx",
+    "benchmarks/current-results.mdx",
+    "benchmarks/latency-evidence.mdx",
+  ]) {
+    const page = await source(path);
+    assert.doesNotMatch(page, /\bnot (?:just|only|merely)\b/i);
+    assert.doesNotMatch(page, /\bit'?s not\b[^.]*\bit'?s\b/i);
+  }
+});
+
+test("keeps responsive benchmark tables usable by keyboard", async () => {
+  const script = await source("table-keyboard-scroll.js");
+  assert.match(script, /ArrowLeft/);
+  assert.match(script, /ArrowRight/);
+  assert.match(script, /role=\"region\"/);
+  assert.match(script, /querySelector\("table"\)/);
+  assert.match(script, /scrollWidth <= region\.clientWidth/);
+  assert.match(script, /event\.preventDefault\(\)/);
+});
+
 test("keeps current guides product-led and historical arithmetic out of current pages", async () => {
   const home = await source("index.mdx");
   assert.match(home, /title: "Build computer-use agents on Modal"/);
