@@ -28,6 +28,22 @@ test("shows native page navigation on documentation pages", async () => {
   }
 });
 
+test("uses the supported Tabler play icon on benchmark run cards", async () => {
+  const currentOverview = await readFile(
+    new URL("../benchmarks/overview.mdx", import.meta.url),
+    "utf8",
+  );
+  const previousOverview = await readFile(
+    new URL("../v1/benchmarks/overview.mdx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(currentOverview, /icon="player-play"/);
+  assert.match(previousOverview, /icon="player-play"/);
+  assert.doesNotMatch(currentOverview, /icon="play"/);
+  assert.doesNotMatch(previousOverview, /icon="play"/);
+});
+
 test("styles each page destination as a separate navigation card", async () => {
   const source = await readFile(new URL("../style.css", import.meta.url), "utf8");
 
