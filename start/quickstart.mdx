@@ -9,8 +9,9 @@ for the complete trajectory.
 
 ## Set explicit application choices
 
-Use one exact region for the Function and Sandbox. Replace `us-west-2` with a region measured for
-your workload.
+Use one supported region selector for the Function and Sandbox. This example uses the public
+narrow selector `us-west`. You can use a Workspace-granted granular selector such as `us-west-2`
+when your Modal Workspace supports it.
 
 ```python
 import modal
@@ -18,11 +19,11 @@ from modal_computer_use import AsyncComputerSandbox, ComputerConfig, ComputerSes
 
 APP_NAME = "computer-use-quickstart"
 ENVIRONMENT = "main"
-REGION = "us-west-2"
+REGION = "us-west"
 
 app = modal.App(APP_NAME)
 image = modal.Image.debian_slim(python_version="3.12").pip_install(
-    "modal-computer-use[modal]==2.0.0"
+    "modal-computer-use[modal]==2.0.1"
 )
 ```
 
@@ -75,7 +76,8 @@ async with AsyncComputerSandbox.create(config=config, app_name=APP_NAME) as owne
 ```
 
 The owner waits for the Function result before it closes. Borrow cleanup runs first. Owner cleanup
-then terminates the desktop.
+then terminates the desktop. Modal can report a provider-native runtime region such as `us-west-2`,
+`us-west1`, or `westus3` for the public `us-west` selector.
 
 ## Deploy the Function
 
@@ -88,5 +90,5 @@ uv run modal deploy --env main quickstart.py
 Invoking the Function and creating the Sandbox can incur Modal charges. Warm capacity remains off
 because `min_containers=0` and this example creates no Sandbox pool.
 
-Use the maintained [session-handoff example](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/examples/modal_function_session_handoff.py)
+Use the maintained [session-handoff example](https://github.com/ashtonchew/modal-computer-use/blob/b60c1cb7495200e36a738c0f6e07961b1d2db93c/examples/modal_function_session_handoff.py)
 for cancellation, spawning, resolved configuration, and recovery handling.

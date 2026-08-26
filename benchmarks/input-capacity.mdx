@@ -1,0 +1,68 @@
+---
+sidebarTitle: "Input capacity"
+title: "Weighted input-capacity result"
+description: "Review the evidence behind the 100-token refill and 400-token burst defaults."
+---
+
+## Use the promoted default
+
+Modal Computer Use 2.0.1 uses a refill of 100 normalized input-work tokens per second and a
+400-token burst. The daemon reserves the complete recursive cost of an ordered batch before any
+desktop mutation. A transient rate limit therefore cannot interrupt an admitted batch halfway
+through.
+
+The `normalized-input-work-v1` policy assigns these costs:
+
+| Input action | Tokens |
+| --- | ---: |
+| Move, mouse down or up, keypress, release all | `1` |
+| Click, double click, triple click | Click count |
+| Hotkey | `max(1, ceil(keys / 4))` |
+| Type | `1 + ceil(characters / 32)` |
+| Scroll | `1 + ceil(amount / 32)` |
+| Coordinate drag | `1` |
+| Path drag | `1 + ceil(path points / 32)` |
+| Hold key with nested actions | `1 + sum(nested action costs)` |
+| Wait, screenshot, zoom, cursor query | `0` |
+
+These weights estimate input work for resource admission. They do not replace application approval
+or safety policy.
+
+## Review the three passing runs
+
+The minimum tested Sandbox used one CPU and 2,048 MiB. Each independent run completed 80 batches
+of 48 ordered mixed input actions. Each batch cost 60 normalized tokens.
+
+| Run | Weighted tokens/sec | Batch p50 | Batch p95 | CPU seconds/token | RSS growth | Result |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| 1 | 527.398 | 113.414 ms | 131.890 ms | 0.007156250 | 0 B | Pass |
+| 2 | 505.135 | 116.777 ms | 148.103 ms | 0.007408333 | 3,817,472 B | Pass |
+| 3 | 380.704 | 149.609 ms | 206.166 ms | 0.008381250 | 29,941,760 B | Pass |
+
+All 240 measured batches returned 48 ordered successful results with native XTest attribution and
+the expected pointer sentinel. The artifacts contain no failures, retries, replacement samples, or
+cleanup survivors. The slowest run sustained 380.704 tokens per second.
+
+## Keep the gate separate from the default
+
+The benchmark configured a diagnostic 2,000-token refill and 4,000-token burst. That limiter stayed
+outside the measured backend capacity. It is not the product default.
+
+Each run had to sustain at least 200 normalized tokens per second. It also had to use no more than
+0.02 aggregate cgroup CPU-seconds per normalized token and add no more than 128 MiB of RSS. Exact
+placement, resources, ingress, XTest attribution, ordered results, and clean lease release were
+required. The measured source revision was
+`eee2b9456c76474a5b50a857af899ff11ca70a32`.
+
+Do not raise the 100/400 product values from this result alone. Run the same-runtime capacity gate
+for your action mix, browser load, resources, and placement.
+
+## Inspect the release evidence
+
+- [Dated input-capacity report](https://github.com/ashtonchew/modal-computer-use/blob/b60c1cb7495200e36a738c0f6e07961b1d2db93c/docs/benchmark-results-2026-08-08-input-capacity.md)
+- [Passing run 1](https://github.com/ashtonchew/modal-computer-use/blob/b60c1cb7495200e36a738c0f6e07961b1d2db93c/benchmark-data/input-capacity-run-1-2026-08-08.json)
+- [Passing run 2](https://github.com/ashtonchew/modal-computer-use/blob/b60c1cb7495200e36a738c0f6e07961b1d2db93c/benchmark-data/input-capacity-run-2-2026-08-08.json)
+- [Passing run 3](https://github.com/ashtonchew/modal-computer-use/blob/b60c1cb7495200e36a738c0f6e07961b1d2db93c/benchmark-data/input-capacity-run-3-2026-08-08.json)
+
+The artifacts are sanitized and immutable. The application repository owns the benchmark runner,
+validation rules, and source evidence.

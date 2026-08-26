@@ -9,7 +9,7 @@ Your application owns the Anthropic client, message history, limits, and approva
 ## Install the provider extra
 
 ```bash
-uv add "modal-computer-use[modal,anthropic]==2.0.0"
+uv add "modal-computer-use[modal,anthropic]==2.0.1"
 ```
 
 Store `ANTHROPIC_API_KEY` in the placed Function. Keep it out of the desktop Sandbox.
@@ -67,7 +67,7 @@ Use a custom batch tool only for a fixed sequence that needs no intermediate mod
 
 ## Use the maintained example
 
-The [Anthropic loop example](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/examples/anthropic_message_server.py) contains reviewed schemas, the placed Function, provider ordering, batch handling, limits, result conversion, cancellation, and cleanup.
+The [Anthropic loop example](https://github.com/ashtonchew/modal-computer-use/blob/b60c1cb7495200e36a738c0f6e07961b1d2db93c/examples/anthropic_message_server.py) contains reviewed schemas, the placed Function, provider ordering, batch handling, limits, result conversion, cancellation, and cleanup.
 
 <Warning>
 Treat tasks, page content, screenshots, provider output, typed text, and clipboard text as untrusted. Ask for approval before an action creates an external effect. Anthropic safety checks do not cover an application-owned batch tool.

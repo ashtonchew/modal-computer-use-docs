@@ -9,7 +9,7 @@ description: "Deploy one Function and one owned desktop with explicit placement 
 Choose these values in application code:
 
 - Modal Environment;
-- one exact Function and Sandbox region;
+- one supported Function and Sandbox region selector;
 - Function and Sandbox CPU and memory;
 - Function and Sandbox Images;
 - timeouts, retries, and scaling limits;
@@ -28,9 +28,11 @@ owner alive until that call reaches a terminal outcome.
 
 ## Verify placement before mutation
 
-The Function decorator and `ComputerConfig.runtime.modal_region` must use the same exact region.
-Borrow entry compares the requested Function region, observed Function placement, and target
-placement. Missing or unverifiable placement fails before desktop mutation.
+The Function decorator and `ComputerConfig.runtime.modal_region` must use the same selector.
+Borrow entry compares that request with the observed Function and target placement. A public
+narrow selector can resolve to concrete AWS, GCP, or Azure region identifiers. A granted granular
+selector requires an exact runtime match. Missing or unverifiable placement fails before desktop
+mutation.
 
 ## Inspect cost-bearing settings
 

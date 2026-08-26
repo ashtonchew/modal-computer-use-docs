@@ -75,11 +75,12 @@
             "groups": [
               {
                 "group": "Results and evidence",
-                "pages": [
-                  "benchmarks/overview",
-                  "benchmarks/current-results",
-                  "benchmarks/latency-evidence"
-                ]
+            "pages": [
+              "benchmarks/overview",
+              "benchmarks/current-results",
+              "benchmarks/input-capacity",
+              "benchmarks/latency-evidence"
+            ]
               },
               {
                 "group": "Run and reproduce",
@@ -98,6 +99,7 @@
                 "group": "Python SDK",
                 "pages": [
                   "reference/overview",
+                  "reference/migration-v2",
                   "reference/configuration",
                   "reference/namespaces",
                   "reference/errors-and-models"
@@ -165,11 +167,12 @@
             "groups": [
               {
                 "group": "Results and evidence",
-                "pages": [
-                  "v1/benchmarks/overview",
-                  "v1/benchmarks/current-results",
-                  "v1/benchmarks/latency-evidence"
-                ]
+            "pages": [
+              "v1/benchmarks/overview",
+              "v1/benchmarks/current-results",
+              "v1/benchmarks/input-capacity",
+              "v1/benchmarks/latency-evidence"
+            ]
               },
               {
                 "group": "Run and reproduce",
@@ -188,6 +191,7 @@
                 "group": "Python SDK",
                 "pages": [
                   "v1/reference/overview",
+                  "v1/reference/migration-v2",
                   "v1/reference/configuration",
                   "v1/reference/namespaces",
                   "v1/reference/errors-and-models"
@@ -281,7 +285,12 @@
     { "source": "/reference/namespaces/observation", "destination": "/reference/namespaces" },
     { "source": "/reference/namespaces/filesystem", "destination": "/reference/namespaces" },
     { "source": "/reference/error-types", "destination": "/reference/errors-and-models" },
-    { "source": "/reference/data-models", "destination": "/reference/errors-and-models" }
+    { "source": "/reference/data-models", "destination": "/reference/errors-and-models" },
+    {
+      "source": "/reference/migration",
+      "destination": "/reference/migration-v2",
+      "permanent": true
+    }
   ],
   "background": {
     "color": {

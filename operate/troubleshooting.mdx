@@ -12,8 +12,10 @@ Read the per-check failure list from `/readyz`. Modal's TCP probe can pass befor
 
 Use `computer.processes.logs("xvfb")` when Xvfb fails. Confirm that `DISPLAY` matches the configured display. The default is `:99`.
 
-If the error names placement, compare the exact requested Function region, observed Function
-region, and target region. Use an exact selector such as `us-west-2` for the placed path.
+If the error names placement, compare the requested Function selector, observed Function region,
+and target region. Both resources must declare the same supported selector. Public narrow
+selectors such as `us-west` can produce provider-native runtime values such as `us-west-2`,
+`us-west1`, or `westus3`. A granted granular selector such as `us-west-2` requires an exact match.
 
 If the error names `computer-step-envelope-v1`, install a daemon that supports the Step
 protocol. Keep the failed operation stopped until the compatibility check passes.

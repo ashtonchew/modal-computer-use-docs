@@ -9,14 +9,16 @@ Your application owns the OpenAI client, conversation, limits, and approval poli
 ## Install the provider extra
 
 ```bash
-uv add "modal-computer-use[modal,openai]==2.0.0"
+uv add "modal-computer-use[modal,openai]==2.0.1"
 ```
 
 Store `OPENAI_API_KEY` in the placed Function. Keep it out of the desktop Sandbox.
 
 ## Keep the loop inside the placed Function
 
-Follow the [session handoff](/build/session-handoff) guide. Create the desktop once, pass its `ComputerSessionHandle` to a Function in the same exact region, and borrow once around the full OpenAI loop.
+Follow the [session handoff](/build/session-handoff) guide. Create the desktop once, pass its
+`ComputerSessionHandle` to a Function that declares the same region selector, and borrow once
+around the full OpenAI loop.
 
 ```python
 async with handle.borrow_async(
@@ -68,7 +70,7 @@ defines readiness and task success. Never replay a call after an unknown mutatio
 
 ## Use the maintained example
 
-The [OpenAI loop example](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/examples/03_openai_computer_loop.py) contains the placed Function, response-wide preflight, limits, batching, result conversion, cancellation, and cleanup.
+The [OpenAI loop example](https://github.com/ashtonchew/modal-computer-use/blob/b60c1cb7495200e36a738c0f6e07961b1d2db93c/examples/03_openai_computer_loop.py) contains the placed Function, response-wide preflight, limits, batching, result conversion, cancellation, and cleanup.
 
 <Warning>
 Treat tasks, page content, screenshots, provider output, typed text, and clipboard text as untrusted. Ask for approval before an action creates an external effect. Hand password changes and CAPTCHA handling to the user.

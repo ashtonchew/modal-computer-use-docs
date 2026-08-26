@@ -25,7 +25,7 @@ from modal_computer_use import (
 config = ComputerConfig(
     runtime=RuntimeConfig(
         modal_environment="main",
-        modal_region="us-west-2",
+        modal_region="us-west",
     ),
     resources=ResourceConfig(
         profile="browser",
@@ -41,14 +41,17 @@ config = ComputerConfig(
 )
 ```
 
-Replace the environment, exact region, CPU, memory, browser, and timeouts with values measured for your workload. Warm capacity stays off until you enable it in Modal.
+Replace the environment, supported region selector, CPU, memory, browser, and timeouts with values
+measured for your workload. Use a public narrow selector such as `us-west` or a Workspace-granted
+granular selector such as `us-west-2`. Broad selectors such as `us` and `eu` cannot prove the
+placed handoff. Warm capacity stays off until you enable it in Modal.
 
 ## Public models
 
 | Model | Owns |
 | --- | --- |
 | `DesktopConfig` | Resolution, DPI, window manager, and display depth |
-| `RuntimeConfig` | Timeouts, Modal environment, and exact region |
+| `RuntimeConfig` | Timeouts, Modal environment, and verifiable region selector |
 | `ResourceConfig` | Resource profile, CPU, memory, and GPU requests |
 | `ImageConfig` | Inline or named image selection and revision |
 | `NetworkConfig` | Network policy and daemon HTTP version |
@@ -57,7 +60,7 @@ Replace the environment, exact region, CPU, memory, browser, and timeouts with v
 | `ActionConfig` | Batches, timeouts, capture, input, subprocesses, and input-work limits |
 | `BudgetConfig` | Trajectory action, screenshot, artifact, recording, and idle budgets |
 
-See the [2.0 configuration source](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/src/modal_computer_use/config.py) for every field and bound.
+See the [2.0 configuration source](https://github.com/ashtonchew/modal-computer-use/blob/b60c1cb7495200e36a738c0f6e07961b1d2db93c/src/modal_computer_use/config.py) for every field and bound.
 
 ## Important defaults
 
@@ -106,7 +109,7 @@ A directly launched daemon reads `COMPUTER_USE_*` variables when it starts. Comm
 | Storage | `COMPUTER_USE_ARTIFACTS_DIR`, `COMPUTER_USE_RECORDINGS_DIR`, `COMPUTER_USE_TRACE_DIR` |
 | Budgets | `COMPUTER_USE_MAX_ACTIONS`, `COMPUTER_USE_MAX_SCREENSHOTS`, `COMPUTER_USE_MAX_IDLE_SECONDS` |
 
-The [application configuration guide](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/configuration.md) lists every environment variable and bound.
+The [application configuration guide](https://github.com/ashtonchew/modal-computer-use/blob/b60c1cb7495200e36a738c0f6e07961b1d2db93c/docs/configuration.md) lists every environment variable and bound.
 
 ## Protect secrets
 

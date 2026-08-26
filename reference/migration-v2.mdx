@@ -1,0 +1,129 @@
+---
+title: "Migrate from v1 to v2"
+sidebarTitle: "Migrate to v2"
+description: "Move a v1.1.0 application to the v2.0.1 ownership, placement, and Step contracts."
+---
+
+Version 2 changes the primary Modal lifecycle. Upgrade the SDK and runtime artifacts together to
+`modal-computer-use==2.0.1`. The daemon keeps its v1 REST and JSON/base64 compatibility routes, but
+the v2 placed trajectory requires the protocol capabilities it verifies during preflight.
+
+If you remain on v1.1.0, use the [preserved 1.x documentation](/v1/index). The version selector also
+keeps every 1.x guide available.
+
+## Replace the primary lifecycle
+
+| v1.1.0 pattern | v2.0.1 default | Required change |
+| --- | --- | --- |
+| An external process owns `ComputerSandbox.create()` and calls the daemon for each model turn. | An async owner creates the desktop once and sends a versioned `ComputerSessionHandle` to an application-owned Modal Function. | Move the model trajectory into the Function. Keep provider SDK imports and model calls in application code. |
+| Each operation creates or attaches to its own desktop or client context. | The Function enters `handle.borrow_async()` once for the complete trajectory. | Hoist the borrow outside the model-turn loop. Release it after the trajectory ends. |
+| Placement may be absent or broad. | Primary `AsyncComputerSandbox.create()` requires an explicit Modal environment and a supported narrow or Workspace-granted granular selector. | Declare the same selector for the owner, Function, and `borrow_async()`. Use `create_unplaced()` only for an intentional low-level path without handoff. |
+| Inline screenshots rely on `Screenshot.data_base64`. | The semantic `screenshots.full()` method uses binary HTTP internally and returns a byte-backed `Screenshot`. | Read `as_bytes()` or call `to_base64()` at a provider boundary. Do not assume `data_base64` is populated. |
+| A model loop calls `actions.run()` and then `screenshots.full()`. | `computer.step()` sends the ordered action array and returns its immediate post-action frame. | Send one ordered array per step and use `ComputerStepResult.screenshot` for the next model turn. |
+| Cleanup relies only on the outer owner context. | The borrowed client and lease close before the owner terminates the desktop. | Keep the owner alive until the Function reaches a terminal result, including cancellation cleanup. |
+| Resource and warm-capacity choices are implicit. | Region, CPU, memory, image, timeouts, retries, scaling limits, and capacity are explicit and inspectable. | Select each cost-bearing value. Keep Function and Sandbox warm capacity at zero unless you intentionally pay for it. |
+
+### Before: v1 external owner
+
+```python
+from modal_computer_use import ComputerConfig, ComputerSandbox
+
+config = ComputerConfig(
+    runtime={"modal_environment": "main"},
+    resources={"profile": "browser", "cpu": 1.0, "memory_mib": 2048},
+)
+
+with ComputerSandbox.create(config=config, app_name="my-app") as computer:
+    screenshot = computer.screenshots.full()
+    action_result = computer.actions.run([{"type": "wait", "duration_ms": 50}])
+```
+
+### After: v2 placed trajectory
+
+```python
+import modal
+from modal_computer_use import AsyncComputerSandbox, ComputerConfig, ComputerSessionHandle
+
+REGION = "us-west"
+app = modal.App("my-app")
+
+
+@app.function(region=REGION, cpu=1.0, memory=2048, retries=0, min_containers=0)
+async def run_trajectory(handle: ComputerSessionHandle, run_id: str):
+    async with handle.borrow_async(run_id=run_id, function_region=REGION) as computer:
+        screenshot = await computer.screenshots.full()
+        while application_has_actions(screenshot):
+            actions = await application_model_call(screenshot)
+            result = await computer.step(actions, continue_on_error=False)
+            screenshot = result.screenshot
+
+
+config = ComputerConfig(
+    ingress="attested-tunnel",
+    runtime={"modal_environment": "main", "modal_region": REGION},
+    resources={"profile": "browser", "cpu": 1.0, "memory_mib": 2048},
+    browser={"kind": "chromium", "prewarm": False},
+)
+
+async with AsyncComputerSandbox.create(config=config, app_name="my-app") as owner:
+    result = await run_trajectory.remote.aio(owner.session_handle(), "run_123")
+```
+
+The owner waits for the Function result. Borrow exit releases the trajectory lease first. Owner
+exit then terminates the desktop.
+
+## Select and verify placement
+
+Use the same requested selector in `ComputerConfig`, the Modal Function decorator, and
+`borrow_async(function_region=...)`.
+
+- A public narrow selector such as `us-west` may resolve to a concrete provider-native runtime
+  region such as AWS `us-west-2`, GCP `us-west1`, or Azure `westus3`. These are valid concrete
+  observations for the public selector.
+- A Workspace-granted granular selector such as `us-west-2` must match the observed runtime region
+  exactly.
+- Broad selectors such as `us` and `eu` fail before allocation. Missing, mismatched, malformed, or
+  unverifiable placement fails before credentials, lease acquisition, or desktop mutation.
+
+The SDK does not fall back to an external caller when placement cannot be verified.
+
+## Update screenshot and Step handling
+
+```python
+screenshot = await computer.screenshots.full()
+image_bytes = screenshot.as_bytes()
+provider_base64 = screenshot.to_base64()
+
+step = await computer.step(actions, continue_on_error=False)
+next_screenshot = step.screenshot
+```
+
+`computer.step()` requires `computer-step-envelope-v1`. Capability preflight fails before mutation
+when the daemon does not support it. A lost response after possible mutation is not replayed
+automatically. Observe or recover according to the reported outcome.
+
+The returned Step frame is an immediate post-action screenshot. It is not an application-readiness
+signal. Direct clients can continue to use retained REST and JSON/base64 routes.
+
+## Review input capacity
+
+The v1 input limit counted flat actions in a rolling window. In v2.0.1,
+`actions.input_rate_limit_per_sec=100` is a weighted-token refill rate and
+`actions.input_rate_limit_burst=400` is the burst. The daemon reserves the complete recursive batch
+before mutation.
+
+If you previously set the rate explicitly, review both values. A transient `rate_limited` response
+is safe because no action in that request ran. `input_cost_exceeds_burst` requires a different
+explicit capacity or request shape.
+
+## Compatibility and rollback
+
+Version 1.1 clients remain compatible with the retained v1 REST and JSON contracts. Do not infer v2
+trajectory support from package versions alone. The v2 SDK verifies capabilities before mutation.
+
+For rollback, restore the package and runtime artifacts as one compatible release set. Do not make
+the v2 client silently select the v1 external-caller topology. The [1.x quickstart](/v1/start/quickstart)
+remains available while you migrate.
+
+The [exact v2.0.1 migration source](https://github.com/ashtonchew/modal-computer-use/blob/b60c1cb7495200e36a738c0f6e07961b1d2db93c/docs/migration-v2.md)
+records the release contract.

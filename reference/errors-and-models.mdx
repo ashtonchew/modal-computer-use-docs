@@ -28,13 +28,13 @@ Import public models from `modal_computer_use`.
 from modal_computer_use import ComputerStepResult, Screenshot
 ```
 
-See the [model source](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/src/modal_computer_use/models.py) and [Step models](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/src/modal_computer_use/steps/models.py) for complete fields.
+See the [model source](https://github.com/ashtonchew/modal-computer-use/blob/b60c1cb7495200e36a738c0f6e07961b1d2db93c/src/modal_computer_use/models.py) and [Step models](https://github.com/ashtonchew/modal-computer-use/blob/b60c1cb7495200e36a738c0f6e07961b1d2db93c/src/modal_computer_use/steps/models.py) for complete fields.
 
 ## Placement and handoff errors
 
 | Error | Meaning |
 | --- | --- |
-| `SessionPlacementMissingError` | A required exact placement value is absent |
+| `SessionPlacementMissingError` | A required placement value is absent |
 | `SessionPlacementMalformedError` | A placement value has an invalid form |
 | `SessionPlacementUnverifiableError` | The SDK cannot prove the required placement |
 | `SessionPlacementMismatchError` | Function and desktop placement differ |

@@ -14,7 +14,7 @@ def require_parameters(callable_: object, *names: str) -> None:
 
 
 def main() -> None:
-    assert mcu.__version__ == "2.0.0"
+    assert mcu.__version__ == "2.0.1"
     for name in (
         "ActionConfig",
         "AsyncBorrowedComputer",
