@@ -1,71 +1,14 @@
 ---
 sidebarTitle: "Current results"
 title: "Current benchmark results"
-description: "Review eligible measurements and the scope of each result."
+description: "Review current and dated benchmark measurements with their scope."
 ---
 
-Each section states what it measures and links its evidence. Read each result within the scope defined by its report.
+The current cross-provider result appears first. Separate sections cover the dated article campaign and Modal product experiments, which answer different questions.
 
-## Computer Step
+## Complete action-to-frame paths, 11 August 2026
 
-The 8 August 2026 promotion run compared two ways to execute one ordered action batch and capture its immediate screenshot within the same topology.
-
-| Same-topology arm | p50 | p95 |
-| --- | ---: | ---: |
-| `actions.run()` then `screenshots.full()` | 47.14 ms | 58.22 ms |
-| `computer.step()` | 44.29 ms | 52.57 ms |
-
-The run retained 100 interleaved pairs per arm. It recorded zero failures, retries, replacements, and cleanup survivors.
-
-Evidence: [Computer Step report](https://github.com/ashtonchew/modal-computer-use/blob/f6b9adeee54f584c345c813750758b7c7b5db744/docs/benchmark-results-2026-08-08-computer-step.md)
-
-An immediate frame completes this timer. First visual change and application readiness use separate signals.
-
-## Raw binary screenshot default
-
-The optimized-default gate measured a full semantic screenshot followed by one pointer move.
-
-| Same-topology arm | p50 | p95 |
-| --- | ---: | ---: |
-| Retained JSON/base64 screenshot path | 147.27 ms | 763.47 ms |
-| Raw binary screenshot with `Screenshot` reconstruction | 81.11 ms | 739.17 ms |
-
-Both arms retained 30 interleaved samples.
-
-Evidence: [Optimized-default report](https://github.com/ashtonchew/modal-computer-use/blob/31bcafefbba2ba75653075a04b12ce2eb816c838/docs/benchmark-results-2026-08-08-optimized-default.md)
-
-This timer used two SDK operations. The Computer Step section covers the fused route.
-
-## Input-work capacity
-
-The minimum tested runtime ran three independent mixed XTest capacity gates.
-
-| Run | Weighted tokens per second | Batch p95 | RSS growth |
-| --- | ---: | ---: | ---: |
-| 1 | 527.40 | 131.89 ms | 0 B |
-| 2 | 505.14 | 148.10 ms | 3,817,472 B |
-| 3 | 380.70 | 206.17 ms | 29,941,760 B |
-
-Each run completed 80 batches of 48 ordered actions. The product default is a 100-token refill with a 400-token burst.
-
-Evidence: [Input-capacity report](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmark-results-2026-08-08-input-capacity.md)
-
-## Managed Image lifecycle
-
-The managed standard Image completed 60 of 60 measured lifecycles with successful cleanup.
-
-| Metric | Inline recipe | Managed exact ID | Change |
-| --- | ---: | ---: | ---: |
-| p50 | 15.47 s | 14.08 s | -8.95 percent |
-| p95 | 44.68 s | 43.27 s | -3.15 percent |
-
-The paired mean confidence interval crossed zero because both arms had large tail outliers. The result supports an opt-in managed standard Image. A universal default requires separate availability, rollback, and variant evidence.
-
-Evidence: [Image lifecycle report](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmark-results-2026-08-08-image-lifecycle.md)
-
-## Complete action-to-frame paths
-
-On 11 August 2026, the benchmark measured one left click at `(512, 384)` followed by the next validated full screenshot through four public SDK paths. It ran two warmups and 100 measured samples for each path. The timer started immediately before ordered action dispatch and ended after the next full screenshot was decoded and validated.
+On 11 August 2026, the benchmark measured four public SDK paths. Each path sent one left click at `(512, 384)` and then captured the next validated full screenshot. The benchmark used two warmups and collected 100 measured samples from each path. The timer started immediately before ordered action dispatch. It ended after the next full screenshot was decoded and validated.
 
 <div className="action-frame-results">
 
@@ -78,23 +21,184 @@ On 11 August 2026, the benchmark measured one left click at `(512, 384)` followe
 
 </div>
 
-The run recorded zero failures, zero harness retries, zero replacement samples, and zero cleanup survivors.
+The run recorded zero failures and zero cleanup survivors. The harness made zero retries and used zero replacement samples.
 
-These values describe complete paths under their recorded configurations. Use a matched-configuration campaign to compare provider implementations. Match caller placement, region, resources, screenshot format, and request shape.
+These values apply to the complete paths and configurations that the campaign recorded. A direct matched-configuration comparison requires the same caller placement, region, resources, screenshot format, and request shape across providers.
 
 Evidence: [dated report](https://github.com/ashtonchew/modal-computer-use/blob/46065138902e17d2525b8a76573c4d3811064462/docs/benchmark-results-2026-08-11-provider-action-frame.md) and [sanitized artifact](https://github.com/ashtonchew/modal-computer-use/blob/46065138902e17d2525b8a76573c4d3811064462/benchmark-data/external-provider-action-frame-2026-08-11.json)
 
 <Accordion title="Configuration and measurement details">
 
-The recorded CPU and memory values describe each desktop target. Modal used the same resource shape for its placed caller and target. External caller capacity has no recorded value.
+The recorded CPU and memory values describe each desktop target. Modal used the same resource shape for its placed caller and target. The benchmark did not record external caller capacity.
 
-- Modal Computer Use / `computer.step()`: `modal-computer-use` 2.0.0. Caller: application-owned Modal Function. Requested and observed region: `us-west-2`. Target and caller resources: one physical CPU and 2048 MiB each. Screenshot: PNG with dimensions unrecorded and a hidden cursor. Request shape: one SDK call and one transport request. Retry policy: no mutation retry.
-- Daytona: Daytona 0.175.0. Caller and placement: external SDK caller with provider defaults. Requested and observed region: provider default. Target resources: one physical CPU and 1024 MiB. Screenshot: 1024 x 768 PNG with an unreported cursor setting. Request shape: two SDK calls and two transport requests. Retry policy: provider default.
-- E2B: E2B Desktop 2.4.2. Caller and placement: external SDK caller with provider defaults. Requested and observed region: provider default. Target resources: two physical CPUs and 1024 MiB. Screenshot: 1024 x 768 PNG with an unreported cursor setting. Request shape: two SDK calls and three transport requests. Retry policy: provider default.
-- Tzafon: Tzafon 2.44.1. Caller and placement: external SDK caller with provider defaults. Requested and observed region: provider default. The provider did not disclose target resources. Screenshot: 1280 x 720 JPEG with an unreported cursor setting. Request shape: two SDK calls and two transport requests. Retry policy: provider default.
+- Modal Computer Use / `computer.step()`: `modal-computer-use` 2.0.0. An application-owned Modal Function called the target. Both resources requested and observed `us-west-2`. The target and caller each used one physical CPU and 2048 MiB. The screenshot was a PNG with unrecorded dimensions and a hidden cursor. One SDK call produced one transport request. The SDK did not retry mutations.
+- Daytona: Daytona 0.175.0. An external caller used the provider defaults for placement and region. The target used one physical CPU and 1024 MiB. The screenshot was a 1024 x 768 PNG with an unreported cursor setting. Two SDK calls produced two transport requests. The provider retry policy applied.
+- E2B: E2B Desktop 2.4.2. An external caller used the provider defaults for placement and region. The target used two physical CPUs and 1024 MiB. The screenshot was a 1024 x 768 PNG with an unreported cursor setting. Two SDK calls produced three transport requests. The provider retry policy applied.
+- Tzafon: Tzafon 2.44.1. An external caller used the provider defaults for placement and region. The provider did not disclose target resources. The screenshot was a 1280 x 720 JPEG with an unreported cursor setting. Two SDK calls produced two transport requests. The provider retry policy applied.
 
 </Accordion>
 
-## Historical provider comparison
+## Historical article warm-operation results, 30 July 2026
 
-The [30 July warm-path report](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmark-results-2026-07-30-warm-paths.md) remains dated historical evidence. It covers screenshots, clicks, ordered batches, typing, and commands. Its provider paths used different caller placement, screenshot formats, and request shapes.
+On 30 July 2026, the article campaign measured six warm operations after the desktop and client connection were ready. Each table reports 30 successful samples for each path. The timer included transport, authentication, request handling, execution, and response collection. It excluded desktop creation and cleanup.
+
+The provider paths differed in caller placement, region, resources, screenshot format, and request shape. The tables report those recorded configurations. Each p50 ratio compares the complete recorded path with Modal optimized for the same operation.
+
+The article campaign measured screenshots and clicks as separate operations. The complete action-to-frame table above reports the measured fused Modal Step result.
+
+### Full screenshot
+
+Each path returned its provider-native full-screen image.
+
+| Path | p50 (ms) | p95 (ms) | p50 ratio to Modal optimized |
+| --- | ---: | ---: | ---: |
+| Modal optimized | 37.25 | 48.76 | 1.00x |
+| Daytona default | 563.57 | 603.79 | 15.13x |
+| E2B default | 198.78 | 223.20 | 5.34x |
+| Modal simple | 115.80 | 132.91 | 3.11x |
+| Tzafon default | 154.25 | 192.53 | 4.14x |
+
+### One click
+
+Each path sent one click to the ready desktop.
+
+| Path | p50 (ms) | p95 (ms) | p50 ratio to Modal optimized |
+| --- | ---: | ---: | ---: |
+| Modal optimized | 9.85 | 16.85 | 1.00x |
+| Daytona default | 386.40 | 394.19 | 39.22x |
+| E2B default | 209.86 | 213.42 | 21.30x |
+| Modal simple | 214.09 | 218.19 | 21.73x |
+| Tzafon default | 130.27 | 170.55 | 13.22x |
+
+### Four ordered clicks
+
+Each path sent four clicks in order.
+
+| Path | p50 (ms) | p95 (ms) | p50 ratio to Modal optimized |
+| --- | ---: | ---: | ---: |
+| Modal optimized | 12.52 | 22.07 | 1.00x |
+| Daytona default | 1,546.74 | 1,577.44 | 123.50x |
+| E2B default | 860.68 | 897.95 | 68.72x |
+| Modal simple | 230.10 | 235.09 | 18.37x |
+| Tzafon default | 458.03 | 499.49 | 36.57x |
+
+### Type 100 characters
+
+Each path typed a 100-character payload.
+
+| Path | p50 (ms) | p95 (ms) | p50 ratio to Modal optimized |
+| --- | ---: | ---: | ---: |
+| Modal optimized | 15.76 | 28.15 | 1.00x |
+| Daytona default | 805.55 | 812.84 | 51.11x |
+| E2B default | 4,083.30 | 4,156.65 | 259.08x |
+| Modal simple | 259.67 | 270.18 | 16.48x |
+| Tzafon default | 85.16 | 101.65 | 5.40x |
+
+### Type 1,000 characters
+
+Each path typed a 1,000-character payload.
+
+| Path | p50 (ms) | p95 (ms) | p50 ratio to Modal optimized |
+| --- | ---: | ---: | ---: |
+| Modal optimized | 53.35 | 79.69 | 1.00x |
+| Daytona default | 5,528.38 | 5,554.88 | 103.63x |
+| E2B default | 40,914.66 | 41,374.28 | 766.95x |
+| Modal simple | 263.95 | 269.71 | 4.95x |
+| Tzafon default | 185.03 | 188.37 | 3.47x |
+
+### Non-login shell command
+
+Each path ran the same logical non-login shell command.
+
+| Path | p50 (ms) | p95 (ms) | p50 ratio to Modal optimized |
+| --- | ---: | ---: | ---: |
+| Modal optimized | 11.69 | 14.12 | 1.00x |
+| Daytona default | 285.33 | 294.57 | 24.40x |
+| E2B default | 55.90 | 69.27 | 4.78x |
+| Modal simple | 72.64 | 158.22 | 6.21x |
+| Tzafon default | 31.73 | 33.35 | 2.71x |
+
+Evidence: [warm-operation report](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmark-results-2026-07-30-warm-paths.md), [Modal optimized artifact](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-optimized-provider-2026-07-30.json), and [provider-default artifact](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/provider-compare-coordinate-command-2026-07-30.json)
+
+<Accordion title="Article path configuration and measurement details">
+
+- Modal optimized: One Modal Function and its targets requested `us-west-2`. The Function and target each used one CPU and 2 GiB. The path used attested-tunnel ingress, HTTP/1.1, XTest input, zero input pacing, and an isolated asyncio subprocess backend.
+- Daytona default: An external caller used Daytona 0.175.0 and its default computer-use path.
+- E2B default: An external caller used E2B Desktop 2.3.1 and its default computer-use path.
+- Modal simple: An external caller used the public Modal Computer Use SDK, standard resources, default input pacing, and the attested-tunnel daemon path.
+- Tzafon default: An external caller used Tzafon 2.44.1 and its default computer-use path.
+
+Tzafon returned 1280 x 720 JPEG screenshots. The other paths returned 1024 x 768 PNG screenshots.
+
+Modal optimized, Modal simple, and Tzafon sent four ordered clicks in one request. Daytona sent four SDK requests. E2B sent four SDK requests through eight transport calls.
+
+For typing, Modal optimized used XTest keystrokes with zero delay. Every other path used its recorded public SDK behavior.
+
+The shell case requested `sh -c "printf '42\n'"` or its provider equivalent. Every successful sample returned exit code 0 and exact stdout `"42\n"`.
+
+The optimized harness used synchronous `ComputerSandbox` and `DaemonClient` objects inside the placed Modal Function. It reused one warm client and connection. This campaign predates the native async owner and daemon client APIs.
+
+</Accordion>
+
+## Modal product evidence, 8 August 2026
+
+The 8 August experiments measured implementation choices and capacity within Modal Computer Use. Each experiment came from a separate campaign.
+
+### Computer Step
+
+On 8 August 2026, the promotion run compared two ways to execute one ordered action batch and capture its immediate screenshot within the same topology.
+
+| Same-topology arm | p50 | p95 |
+| --- | ---: | ---: |
+| `actions.run()` then `screenshots.full()` | 47.14 ms | 58.22 ms |
+| `computer.step()` | 44.29 ms | 52.57 ms |
+
+The run retained 100 interleaved pairs per arm. It recorded zero failures and zero cleanup survivors. The harness made zero retries and used zero replacement samples.
+
+Evidence: [Computer Step report](https://github.com/ashtonchew/modal-computer-use/blob/f6b9adeee54f584c345c813750758b7c7b5db744/docs/benchmark-results-2026-08-08-computer-step.md)
+
+The current cross-provider campaign measured `computer.step()` at 43.13 ms p50 and 46.35 ms p95. The cross-provider campaign ran on 11 August, while the same-topology promotion campaign ran on 8 August.
+
+An immediate frame ended each timer. First visual change and application readiness use separate signals.
+
+### Raw binary screenshot default
+
+The optimized-default gate measured a full semantic screenshot followed by one pointer move.
+
+| Same-topology arm | p50 | p95 |
+| --- | ---: | ---: |
+| Retained JSON/base64 screenshot path | 147.27 ms | 763.47 ms |
+| Raw binary screenshot with `Screenshot` reconstruction | 81.11 ms | 739.17 ms |
+
+Both arms retained 30 interleaved samples.
+
+Evidence: [Optimized-default report](https://github.com/ashtonchew/modal-computer-use/blob/31bcafefbba2ba75653075a04b12ce2eb816c838/docs/benchmark-results-2026-08-08-optimized-default.md)
+
+The timer covered two SDK operations. The Computer Step section covers the fused route.
+
+### Input-work capacity
+
+The minimum tested runtime completed three independent mixed XTest capacity gates.
+
+| Run | Weighted tokens per second | Batch p95 | RSS growth |
+| --- | ---: | ---: | ---: |
+| 1 | 527.40 | 131.89 ms | 0 B |
+| 2 | 505.14 | 148.10 ms | 3,817,472 B |
+| 3 | 380.70 | 206.17 ms | 29,941,760 B |
+
+Each run completed 80 batches of 48 ordered actions. The product default is a 100-token refill with a 400-token burst.
+
+Evidence: [Input-capacity report](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmark-results-2026-08-08-input-capacity.md)
+
+### Managed Image lifecycle
+
+All 60 measured lifecycles for the managed standard Image completed, and cleanup succeeded each time.
+
+| Metric | Inline recipe | Managed exact ID | Change |
+| --- | ---: | ---: | ---: |
+| p50 | 15.47 s | 14.08 s | -8.95 percent |
+| p95 | 44.68 s | 43.27 s | -3.15 percent |
+
+The paired mean confidence interval crossed zero because both arms had large tail outliers. The result supports offering the managed standard Image as an opt-in choice. A universal default requires separate availability, rollback, and variant evidence.
+
+Evidence: [Image lifecycle report](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmark-results-2026-08-08-image-lifecycle.md)
