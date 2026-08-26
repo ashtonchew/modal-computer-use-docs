@@ -65,13 +65,11 @@ test("publishes the complete action-to-frame evidence without turning it into a 
   assert.doesNotMatch(overview, /\| Question \| Current result \|/);
 
   const results = await source("benchmarks/current-results.mdx");
-  assert.match(results, /## Complete action-to-frame paths/);
+  assert.match(results, /## Complete action-to-frame paths, 11 August 2026/);
   assert.match(results, /one left click at `\(512, 384\)`/);
-  assert.match(results, /two warmups and 100 measured samples for each path/i);
-  assert.match(
-    results,
-    /timer started immediately before ordered action dispatch and ended after the next full screenshot was decoded and validated/i,
-  );
+  assert.match(results, /used two warmups and collected 100 measured samples from each path/i);
+  assert.match(results, /timer started immediately before ordered action dispatch/i);
+  assert.match(results, /ended after the next full screenshot was decoded and validated/i);
   assert.match(results, /\| Path \| p50 \(ms\) \| p95 \(ms\) \|/);
   assert.match(results, /\| Modal Computer Use \/ `computer\.step\(\)` \| 43\.13 \| 46\.35 \|/);
   assert.match(results, /\| Daytona \| 1039\.59 \| 1143\.06 \|/);
@@ -82,11 +80,12 @@ test("publishes the complete action-to-frame evidence without turning it into a 
   const styles = await source("style.css");
   assert.match(styles, /\.action-frame-results th/);
   assert.match(styles, /\.action-frame-results td/);
-  assert.match(results, /zero failures, zero harness retries, zero replacement samples, and zero cleanup survivors/i);
-  assert.match(results, /Use a matched-configuration campaign to compare provider implementations/);
+  assert.match(results, /zero failures and zero cleanup survivors/i);
+  assert.match(results, /zero retries and used zero replacement samples/i);
+  assert.match(results, /A direct matched-configuration comparison requires the same caller placement/i);
   assert.match(results, /<Accordion title="Configuration and measurement details">/);
   assert.match(results, /application-owned Modal Function/);
-  assert.match(results, /requested and observed region: `us-west-2`/i);
+  assert.match(results, /Both resources requested and observed `us-west-2`/i);
   assert.match(results, /Daytona 0\.175\.0/);
   assert.match(results, /E2B Desktop 2\.4\.2/);
   assert.match(results, /Tzafon 2\.44\.1/);
@@ -101,9 +100,9 @@ test("publishes the complete action-to-frame evidence without turning it into a 
     /https:\/\/github\.com\/ashtonchew\/modal-computer-use\/blob\/46065138902e17d2525b8a76573c4d3811064462\/benchmark-data\/external-provider-action-frame-2026-08-11\.json/,
   );
 
-  const actionFrameStart = results.indexOf("## Complete action-to-frame paths");
-  const historyStart = results.indexOf("## Historical provider comparison");
-  const actionFrameSection = results.slice(actionFrameStart, historyStart);
+  const actionFrameStart = results.indexOf("## Complete action-to-frame paths, 11 August 2026");
+  const articleStart = results.indexOf("## Historical article warm-operation results, 30 July 2026");
+  const actionFrameSection = results.slice(actionFrameStart, articleStart);
   assert.doesNotMatch(actionFrameSection, /\*\*(?:43\.13|46\.35|1039\.59|1143\.06|15659\.63|15744\.76|264\.37|346\.10)\*\*/);
   assert.doesNotMatch(actionFrameSection, /winner|fastest|outperform/i);
 
@@ -118,6 +117,89 @@ test("publishes the complete action-to-frame evidence without turning it into a 
   assert.match(evidence, /modal-computer-use\/issues\/251/);
   assert.match(evidence, /Fresh create to first validated screenshot \| Unverified/);
   assert.match(evidence, /modal-computer-use\/issues\/252/);
+});
+
+test("publishes the dated article campaign with complete provider details", async () => {
+  const results = await source("benchmarks/current-results.mdx");
+  const actionFrameStart = results.indexOf("## Complete action-to-frame paths, 11 August 2026");
+  const articleStart = results.indexOf("## Historical article warm-operation results, 30 July 2026");
+  const modalEvidenceStart = results.indexOf("## Modal product evidence, 8 August 2026");
+  assert.ok(actionFrameStart >= 0);
+  assert.ok(articleStart > actionFrameStart);
+  assert.ok(modalEvidenceStart > articleStart);
+
+  const article = results.slice(articleStart, modalEvidenceStart);
+  assert.match(article, /six warm operations after the desktop and client connection were ready/i);
+  assert.match(article, /Each table reports 30 successful samples for each path/);
+  assert.match(article, /included transport, authentication, request handling, execution, and response collection/i);
+  assert.match(article, /excluded desktop creation and cleanup/i);
+  assert.match(article, /screenshots and clicks as separate operations/i);
+  assert.match(article, /complete action-to-frame table above reports the measured fused Modal Step result/i);
+  assert.equal(
+    [...article.matchAll(/\| Path \| p50 \(ms\) \| p95 \(ms\) \| p50 ratio to Modal optimized \|/g)].length,
+    6,
+  );
+
+  const expectedRows = [
+    "| Modal optimized | 37.25 | 48.76 | 1.00x |",
+    "| Daytona default | 563.57 | 603.79 | 15.13x |",
+    "| E2B default | 198.78 | 223.20 | 5.34x |",
+    "| Modal simple | 115.80 | 132.91 | 3.11x |",
+    "| Tzafon default | 154.25 | 192.53 | 4.14x |",
+    "| Modal optimized | 9.85 | 16.85 | 1.00x |",
+    "| Daytona default | 386.40 | 394.19 | 39.22x |",
+    "| E2B default | 209.86 | 213.42 | 21.30x |",
+    "| Modal simple | 214.09 | 218.19 | 21.73x |",
+    "| Tzafon default | 130.27 | 170.55 | 13.22x |",
+    "| Modal optimized | 12.52 | 22.07 | 1.00x |",
+    "| Daytona default | 1,546.74 | 1,577.44 | 123.50x |",
+    "| E2B default | 860.68 | 897.95 | 68.72x |",
+    "| Modal simple | 230.10 | 235.09 | 18.37x |",
+    "| Tzafon default | 458.03 | 499.49 | 36.57x |",
+    "| Modal optimized | 15.76 | 28.15 | 1.00x |",
+    "| Daytona default | 805.55 | 812.84 | 51.11x |",
+    "| E2B default | 4,083.30 | 4,156.65 | 259.08x |",
+    "| Modal simple | 259.67 | 270.18 | 16.48x |",
+    "| Tzafon default | 85.16 | 101.65 | 5.40x |",
+    "| Modal optimized | 53.35 | 79.69 | 1.00x |",
+    "| Daytona default | 5,528.38 | 5,554.88 | 103.63x |",
+    "| E2B default | 40,914.66 | 41,374.28 | 766.95x |",
+    "| Modal simple | 263.95 | 269.71 | 4.95x |",
+    "| Tzafon default | 185.03 | 188.37 | 3.47x |",
+    "| Modal optimized | 11.69 | 14.12 | 1.00x |",
+    "| Daytona default | 285.33 | 294.57 | 24.40x |",
+    "| E2B default | 55.90 | 69.27 | 4.78x |",
+    "| Modal simple | 72.64 | 158.22 | 6.21x |",
+    "| Tzafon default | 31.73 | 33.35 | 2.71x |",
+  ];
+  for (const row of expectedRows) {
+    assert.ok(article.includes(row), `missing article result row: ${row}`);
+  }
+
+  assert.match(article, /Daytona 0\.175\.0/);
+  assert.match(article, /E2B Desktop 2\.3\.1/);
+  assert.match(article, /Tzafon 2\.44\.1/);
+  assert.match(article, /Tzafon returned 1280 x 720 JPEG screenshots/);
+  assert.match(article, /E2B sent four SDK requests through eight transport calls/i);
+  assert.match(
+    article,
+    /https:\/\/github\.com\/ashtonchew\/modal-computer-use\/blob\/4425402dbc681133252dbc54d971ea4c95bc0ffc\/docs\/benchmark-results-2026-07-30-warm-paths\.md/,
+  );
+  assert.match(
+    article,
+    /https:\/\/github\.com\/ashtonchew\/modal-computer-use\/blob\/4425402dbc681133252dbc54d971ea4c95bc0ffc\/benchmark-data\/modal-optimized-provider-2026-07-30\.json/,
+  );
+  assert.match(
+    article,
+    /https:\/\/github\.com\/ashtonchew\/modal-computer-use\/blob\/4425402dbc681133252dbc54d971ea4c95bc0ffc\/benchmark-data\/provider-compare-coordinate-command-2026-07-30\.json/,
+  );
+  assert.doesNotMatch(article, /winner|fastest|outperform/i);
+  assert.doesNotMatch(results, /47\.10/);
+
+  const evidence = await source("benchmarks/latency-evidence.mdx");
+  assert.match(evidence, /Warm screenshots, clicks, typing, and commands \| Historical/);
+  assert.match(evidence, /modal-optimized-provider-2026-07-30\.json/);
+  assert.match(evidence, /provider-compare-coordinate-command-2026-07-30\.json/);
 });
 
 test("keeps active benchmark prose direct", async () => {
@@ -142,7 +224,7 @@ test("keeps responsive benchmark tables usable by keyboard", async () => {
   assert.match(script, /event\.preventDefault\(\)/);
 });
 
-test("keeps current guides product-led and historical arithmetic out of current pages", async () => {
+test("keeps current guides product-led and historical arithmetic scoped", async () => {
   const home = await source("index.mdx");
   assert.match(home, /title: "Build computer-use agents on Modal"/);
   assert.match(home, /computer\.step/);
@@ -157,13 +239,19 @@ test("keeps current guides product-led and historical arithmetic out of current 
   const activeFiles = (await readdir(root, { recursive: true }))
     .filter((path) => path.endsWith(".mdx"))
     .filter((path) => !path.startsWith("v1/"));
-  const historicalArithmeticPages = [];
+  const derivedArithmeticPages = [];
+  const historicalMeasurementPages = [];
   for (const path of activeFiles) {
-    if (/47\.10|37\.25|9\.85/.test(await source(path))) {
-      historicalArithmeticPages.push(path);
+    const page = await source(path);
+    if (/47\.10/.test(page)) {
+      derivedArithmeticPages.push(path);
+    }
+    if (/37\.25|9\.85/.test(page)) {
+      historicalMeasurementPages.push(path);
     }
   }
-  assert.deepEqual(historicalArithmeticPages, []);
+  assert.deepEqual(derivedArithmeticPages, []);
+  assert.deepEqual(historicalMeasurementPages, ["benchmarks/current-results.mdx"]);
 });
 
 test("documents current defaults and opt-in runtime features", async () => {
