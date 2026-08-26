@@ -4,47 +4,15 @@ title: "Current benchmark results"
 description: "Review current and dated benchmark measurements with their scope."
 ---
 
-The current cross-provider result appears first. Separate sections cover the dated article campaign and Modal product experiments, which answer different questions.
+The results appear in measurement order. Each section defines its benchmark boundary and configuration limits.
 
-## Complete action-to-frame paths, 11 August 2026
+## Warm-operation benchmarks, 30 July 2026
 
-On 11 August 2026, the benchmark measured four public SDK paths. Each path sent one left click at `(512, 384)` and then captured the next validated full screenshot. The benchmark used two warmups and collected 100 measured samples from each path. The timer started immediately before ordered action dispatch. It ended after the next full screenshot was decoded and validated.
-
-<div className="action-frame-results">
-
-  | Path | p50 (ms) | p95 (ms) |
-  | --- | ---: | ---: |
-  | Modal Computer Use / `computer.step()` | 43.13 | 46.35 |
-  | Daytona | 1039.59 | 1143.06 |
-  | E2B | 15659.63 | 15744.76 |
-  | Tzafon | 264.37 | 346.10 |
-
-</div>
-
-The run recorded zero failures and zero cleanup survivors. The harness made zero retries and used zero replacement samples.
-
-These values apply to the complete paths and configurations that the campaign recorded. A direct matched-configuration comparison requires the same caller placement, region, resources, screenshot format, and request shape across providers.
-
-Evidence: [dated report](https://github.com/ashtonchew/modal-computer-use/blob/46065138902e17d2525b8a76573c4d3811064462/docs/benchmark-results-2026-08-11-provider-action-frame.md) and [sanitized artifact](https://github.com/ashtonchew/modal-computer-use/blob/46065138902e17d2525b8a76573c4d3811064462/benchmark-data/external-provider-action-frame-2026-08-11.json)
-
-<Accordion title="Configuration and measurement details">
-
-The recorded CPU and memory values describe each desktop target. Modal used the same resource shape for its placed caller and target. The benchmark did not record external caller capacity.
-
-- Modal Computer Use / `computer.step()`: `modal-computer-use` 2.0.0. An application-owned Modal Function called the target. Both resources requested and observed `us-west-2`. The target and caller each used one physical CPU and 2048 MiB. The screenshot was a PNG with unrecorded dimensions and a hidden cursor. One SDK call produced one transport request. The SDK did not retry mutations.
-- Daytona: Daytona 0.175.0. An external caller used the provider defaults for placement and region. The target used one physical CPU and 1024 MiB. The screenshot was a 1024 x 768 PNG with an unreported cursor setting. Two SDK calls produced two transport requests. The provider retry policy applied.
-- E2B: E2B Desktop 2.4.2. An external caller used the provider defaults for placement and region. The target used two physical CPUs and 1024 MiB. The screenshot was a 1024 x 768 PNG with an unreported cursor setting. Two SDK calls produced three transport requests. The provider retry policy applied.
-- Tzafon: Tzafon 2.44.1. An external caller used the provider defaults for placement and region. The provider did not disclose target resources. The screenshot was a 1280 x 720 JPEG with an unreported cursor setting. Two SDK calls produced two transport requests. The provider retry policy applied.
-
-</Accordion>
-
-## Historical article warm-operation results, 30 July 2026
-
-On 30 July 2026, the article campaign measured six warm operations after the desktop and client connection were ready. Each table reports 30 successful samples for each path. The timer included transport, authentication, request handling, execution, and response collection. It excluded desktop creation and cleanup.
+On 30 July 2026, the benchmark measured six warm operations after the desktop and client connection were ready. Each table reports 30 successful samples for each path. The timer included transport, authentication, request handling, execution, and response collection. It excluded desktop creation and cleanup.
 
 The provider paths differed in caller placement, region, resources, screenshot format, and request shape. The tables report those recorded configurations. Each p50 ratio compares the complete recorded path with Modal optimized for the same operation.
 
-The article campaign measured screenshots and clicks as separate operations. The complete action-to-frame table above reports the measured fused Modal Step result.
+The benchmark measured screenshots and clicks as separate operations. The complete action-to-frame section reports a later fused Modal Step measurement.
 
 ### Full screenshot
 
@@ -120,13 +88,13 @@ Each path ran the same logical non-login shell command.
 
 Evidence: [warm-operation report](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/docs/benchmark-results-2026-07-30-warm-paths.md), [Modal optimized artifact](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/modal-optimized-provider-2026-07-30.json), and [provider-default artifact](https://github.com/ashtonchew/modal-computer-use/blob/4425402dbc681133252dbc54d971ea4c95bc0ffc/benchmark-data/provider-compare-coordinate-command-2026-07-30.json)
 
-<Accordion title="Article path configuration and measurement details">
+<Accordion title="Warm-operation path configuration and measurement details">
 
 - Modal optimized: One Modal Function and its targets requested `us-west-2`. The Function and target each used one CPU and 2 GiB. The path used attested-tunnel ingress, HTTP/1.1, XTest input, zero input pacing, and an isolated asyncio subprocess backend.
-- Daytona default: An external caller used Daytona 0.175.0 and its default computer-use path.
-- E2B default: An external caller used E2B Desktop 2.3.1 and its default computer-use path.
+- Daytona default: An external caller used Daytona 0.175.0 and its [provider-default computer-use path](https://www.daytona.io/docs/en/computer-use).
+- E2B default: An external caller used E2B Desktop 2.3.1 and its [provider-default computer-use path](https://e2b.dev/docs/sdk-reference/desktop-python-sdk/v1.0.1/sandbox).
 - Modal simple: An external caller used the public Modal Computer Use SDK, standard resources, default input pacing, and the attested-tunnel daemon path.
-- Tzafon default: An external caller used Tzafon 2.44.1 and its default computer-use path.
+- Tzafon default: An external caller used Tzafon 2.44.1 and its [provider-default computer-use path](https://docs.lightcone.ai/guides/operate-a-computer).
 
 Tzafon returned 1280 x 720 JPEG screenshots. The other paths returned 1024 x 768 PNG screenshots.
 
@@ -136,17 +104,17 @@ For typing, Modal optimized used XTest keystrokes with zero delay. Every other p
 
 The shell case requested `sh -c "printf '42\n'"` or its provider equivalent. Every successful sample returned exit code 0 and exact stdout `"42\n"`.
 
-The optimized harness used synchronous `ComputerSandbox` and `DaemonClient` objects inside the placed Modal Function. It reused one warm client and connection. This campaign predates the native async owner and daemon client APIs.
+The optimized harness used synchronous `ComputerSandbox` and `DaemonClient` objects inside the placed Modal Function. It reused one warm client and connection. This benchmark predates the native async owner and daemon client APIs.
 
 </Accordion>
 
-## Modal product evidence, 8 August 2026
+## Modal product benchmarks, 8 August 2026
 
-The 8 August experiments measured implementation choices and capacity within Modal Computer Use. Each experiment came from a separate campaign.
+The 8 August results cover implementation choices and capacity within Modal Computer Use. Each came from a separate benchmark run.
 
 ### Computer Step
 
-On 8 August 2026, the promotion run compared two ways to execute one ordered action batch and capture its immediate screenshot within the same topology.
+On 8 August 2026, the Computer Step benchmark compared two ways to execute one ordered action batch and capture its immediate screenshot within the same topology.
 
 | Same-topology arm | p50 | p95 |
 | --- | ---: | ---: |
@@ -157,7 +125,7 @@ The run retained 100 interleaved pairs per arm. It recorded zero failures and ze
 
 Evidence: [Computer Step report](https://github.com/ashtonchew/modal-computer-use/blob/f6b9adeee54f584c345c813750758b7c7b5db744/docs/benchmark-results-2026-08-08-computer-step.md)
 
-The current cross-provider campaign measured `computer.step()` at 43.13 ms p50 and 46.35 ms p95. The cross-provider campaign ran on 11 August, while the same-topology promotion campaign ran on 8 August.
+The 11 August complete action-to-frame benchmark measured `computer.step()` at 43.13 ms p50 and 46.35 ms p95. The same-topology result above came from 8 August.
 
 An immediate frame ended each timer. First visual change and application readiness use separate signals.
 
@@ -202,3 +170,35 @@ All 60 measured lifecycles for the managed standard Image completed, and cleanup
 The paired mean confidence interval crossed zero because both arms had large tail outliers. The result supports offering the managed standard Image as an opt-in choice. A universal default requires separate availability, rollback, and variant evidence.
 
 Evidence: [Image lifecycle report](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmark-results-2026-08-08-image-lifecycle.md)
+
+## Complete action-to-frame benchmarks, 11 August 2026
+
+On 11 August 2026, the benchmark measured four public SDK paths. Each path sent one left click at `(512, 384)` and then captured the next validated full screenshot. The benchmark used two warmups and collected 100 measured samples from each path. The timer started immediately before ordered action dispatch. It ended after the next full screenshot was decoded and validated.
+
+<div className="action-frame-results">
+
+  | Path | p50 (ms) | p95 (ms) |
+  | --- | ---: | ---: |
+  | Modal Computer Use / `computer.step()` | 43.13 | 46.35 |
+  | Daytona | 1039.59 | 1143.06 |
+  | E2B | 15659.63 | 15744.76 |
+  | Tzafon | 264.37 | 346.10 |
+
+</div>
+
+The run recorded zero failures and zero cleanup survivors. The harness made zero retries and used zero replacement samples.
+
+These values apply to the complete paths and recorded configurations. A direct matched-configuration comparison requires the same caller placement, region, resources, screenshot format, and request shape across providers.
+
+Evidence: [dated report](https://github.com/ashtonchew/modal-computer-use/blob/46065138902e17d2525b8a76573c4d3811064462/docs/benchmark-results-2026-08-11-provider-action-frame.md) and [sanitized artifact](https://github.com/ashtonchew/modal-computer-use/blob/46065138902e17d2525b8a76573c4d3811064462/benchmark-data/external-provider-action-frame-2026-08-11.json)
+
+<Accordion title="Configuration and measurement details">
+
+The recorded CPU and memory values describe each desktop target. Modal used the same resource shape for its placed caller and target. The benchmark did not record external caller capacity.
+
+- Modal Computer Use / `computer.step()`: `modal-computer-use` 2.0.0. An application-owned Modal Function called the target. Both resources requested and observed `us-west-2`. The target and caller each used one physical CPU and 2048 MiB. The screenshot was a PNG with unrecorded dimensions and a hidden cursor. One SDK call produced one transport request. The SDK did not retry mutations.
+- Daytona: Daytona 0.175.0. An external caller used the provider defaults for placement and region. The target used one physical CPU and 1024 MiB. The screenshot was a 1024 x 768 PNG with an unreported cursor setting. Two SDK calls produced two transport requests. The provider retry policy applied.
+- E2B: E2B Desktop 2.4.2. An external caller used the provider defaults for placement and region. The target used two physical CPUs and 1024 MiB. The screenshot was a 1024 x 768 PNG with an unreported cursor setting. Two SDK calls produced three transport requests. The provider retry policy applied.
+- Tzafon: Tzafon 2.44.1. An external caller used the provider defaults for placement and region. The provider did not disclose target resources. The screenshot was a 1280 x 720 JPEG with an unreported cursor setting. Two SDK calls produced two transport requests. The provider retry policy applied.
+
+</Accordion>

@@ -65,7 +65,7 @@ test("publishes the complete action-to-frame evidence without turning it into a 
   assert.doesNotMatch(overview, /\| Question \| Current result \|/);
 
   const results = await source("benchmarks/current-results.mdx");
-  assert.match(results, /## Complete action-to-frame paths, 11 August 2026/);
+  assert.match(results, /## Complete action-to-frame benchmarks, 11 August 2026/);
   assert.match(results, /one left click at `\(512, 384\)`/);
   assert.match(results, /used two warmups and collected 100 measured samples from each path/i);
   assert.match(results, /timer started immediately before ordered action dispatch/i);
@@ -100,15 +100,14 @@ test("publishes the complete action-to-frame evidence without turning it into a 
     /https:\/\/github\.com\/ashtonchew\/modal-computer-use\/blob\/46065138902e17d2525b8a76573c4d3811064462\/benchmark-data\/external-provider-action-frame-2026-08-11\.json/,
   );
 
-  const actionFrameStart = results.indexOf("## Complete action-to-frame paths, 11 August 2026");
-  const articleStart = results.indexOf("## Historical article warm-operation results, 30 July 2026");
-  const actionFrameSection = results.slice(actionFrameStart, articleStart);
+  const actionFrameStart = results.indexOf("## Complete action-to-frame benchmarks, 11 August 2026");
+  const actionFrameSection = results.slice(actionFrameStart);
   assert.doesNotMatch(actionFrameSection, /\*\*(?:43\.13|46\.35|1039\.59|1143\.06|15659\.63|15744\.76|264\.37|346\.10)\*\*/);
   assert.doesNotMatch(actionFrameSection, /winner|fastest|outperform/i);
 
   const evidence = await source("benchmarks/latency-evidence.mdx");
   assert.match(evidence, /\| Claim \| Status \| Measurement boundary \| Proof \|/);
-  assert.match(evidence, /Complete action-to-frame paths/);
+  assert.match(evidence, /Complete action-to-frame benchmark/);
   assert.match(evidence, /Eligible/);
   assert.match(evidence, /one click at `\(512, 384\)`/i);
   assert.match(evidence, /100 measured samples per path/);
@@ -119,24 +118,24 @@ test("publishes the complete action-to-frame evidence without turning it into a 
   assert.match(evidence, /modal-computer-use\/issues\/252/);
 });
 
-test("publishes the dated article campaign with complete provider details", async () => {
+test("publishes dated warm-operation benchmarks with complete provider details", async () => {
   const results = await source("benchmarks/current-results.mdx");
-  const actionFrameStart = results.indexOf("## Complete action-to-frame paths, 11 August 2026");
-  const articleStart = results.indexOf("## Historical article warm-operation results, 30 July 2026");
-  const modalEvidenceStart = results.indexOf("## Modal product evidence, 8 August 2026");
-  assert.ok(actionFrameStart >= 0);
-  assert.ok(articleStart > actionFrameStart);
-  assert.ok(modalEvidenceStart > articleStart);
+  const warmStart = results.indexOf("## Warm-operation benchmarks, 30 July 2026");
+  const modalStart = results.indexOf("## Modal product benchmarks, 8 August 2026");
+  const actionFrameStart = results.indexOf("## Complete action-to-frame benchmarks, 11 August 2026");
+  assert.ok(warmStart >= 0);
+  assert.ok(modalStart > warmStart);
+  assert.ok(actionFrameStart > modalStart);
 
-  const article = results.slice(articleStart, modalEvidenceStart);
-  assert.match(article, /six warm operations after the desktop and client connection were ready/i);
-  assert.match(article, /Each table reports 30 successful samples for each path/);
-  assert.match(article, /included transport, authentication, request handling, execution, and response collection/i);
-  assert.match(article, /excluded desktop creation and cleanup/i);
-  assert.match(article, /screenshots and clicks as separate operations/i);
-  assert.match(article, /complete action-to-frame table above reports the measured fused Modal Step result/i);
+  const warm = results.slice(warmStart, modalStart);
+  assert.match(warm, /six warm operations after the desktop and client connection were ready/i);
+  assert.match(warm, /Each table reports 30 successful samples for each path/);
+  assert.match(warm, /included transport, authentication, request handling, execution, and response collection/i);
+  assert.match(warm, /excluded desktop creation and cleanup/i);
+  assert.match(warm, /screenshots and clicks as separate operations/i);
+  assert.match(warm, /complete action-to-frame section reports a later fused Modal Step measurement/i);
   assert.equal(
-    [...article.matchAll(/\| Path \| p50 \(ms\) \| p95 \(ms\) \| p50 ratio to Modal optimized \|/g)].length,
+    [...warm.matchAll(/\| Path \| p50 \(ms\) \| p95 \(ms\) \| p50 ratio to Modal optimized \|/g)].length,
     6,
   );
 
@@ -173,33 +172,56 @@ test("publishes the dated article campaign with complete provider details", asyn
     "| Tzafon default | 31.73 | 33.35 | 2.71x |",
   ];
   for (const row of expectedRows) {
-    assert.ok(article.includes(row), `missing article result row: ${row}`);
+    assert.ok(warm.includes(row), `missing warm-operation result row: ${row}`);
   }
 
-  assert.match(article, /Daytona 0\.175\.0/);
-  assert.match(article, /E2B Desktop 2\.3\.1/);
-  assert.match(article, /Tzafon 2\.44\.1/);
-  assert.match(article, /Tzafon returned 1280 x 720 JPEG screenshots/);
-  assert.match(article, /E2B sent four SDK requests through eight transport calls/i);
+  assert.match(warm, /Daytona 0\.175\.0/);
+  assert.match(warm, /E2B Desktop 2\.3\.1/);
+  assert.match(warm, /Tzafon 2\.44\.1/);
+  assert.match(warm, /Tzafon returned 1280 x 720 JPEG screenshots/);
+  assert.match(warm, /E2B sent four SDK requests through eight transport calls/i);
+  assert.match(warm, /<Accordion title="Warm-operation path configuration and measurement details">/);
   assert.match(
-    article,
+    warm,
+    /\[provider-default computer-use path\]\(https:\/\/www\.daytona\.io\/docs\/en\/computer-use\)/,
+  );
+  assert.match(
+    warm,
+    /\[provider-default computer-use path\]\(https:\/\/e2b\.dev\/docs\/sdk-reference\/desktop-python-sdk\/v1\.0\.1\/sandbox\)/,
+  );
+  assert.match(
+    warm,
+    /\[provider-default computer-use path\]\(https:\/\/docs\.lightcone\.ai\/guides\/operate-a-computer\)/,
+  );
+  assert.match(
+    warm,
     /https:\/\/github\.com\/ashtonchew\/modal-computer-use\/blob\/4425402dbc681133252dbc54d971ea4c95bc0ffc\/docs\/benchmark-results-2026-07-30-warm-paths\.md/,
   );
   assert.match(
-    article,
+    warm,
     /https:\/\/github\.com\/ashtonchew\/modal-computer-use\/blob\/4425402dbc681133252dbc54d971ea4c95bc0ffc\/benchmark-data\/modal-optimized-provider-2026-07-30\.json/,
   );
   assert.match(
-    article,
+    warm,
     /https:\/\/github\.com\/ashtonchew\/modal-computer-use\/blob\/4425402dbc681133252dbc54d971ea4c95bc0ffc\/benchmark-data\/provider-compare-coordinate-command-2026-07-30\.json/,
   );
-  assert.doesNotMatch(article, /winner|fastest|outperform/i);
+  assert.doesNotMatch(warm, /winner|fastest|outperform/i);
   assert.doesNotMatch(results, /47\.10/);
+  assert.doesNotMatch(results, /\barticle\b|\bcampaign\b|promotion run/i);
 
   const evidence = await source("benchmarks/latency-evidence.mdx");
   assert.match(evidence, /Warm screenshots, clicks, typing, and commands \| Historical/);
   assert.match(evidence, /modal-optimized-provider-2026-07-30\.json/);
   assert.match(evidence, /provider-compare-coordinate-command-2026-07-30\.json/);
+});
+
+test("defines the benchmark result vocabulary", async () => {
+  const context = await source("CONTEXT.md");
+  assert.match(context, /\*\*Warm-operation benchmark\*\*/);
+  assert.match(context, /\*\*Modal product benchmark\*\*/);
+  assert.match(context, /\*\*Complete action-to-frame benchmark\*\*/);
+  assert.match(context, /Desktop creation and cleanup are outside its timer/);
+  assert.match(context, /ordered action dispatch through the next decoded and validated screenshot/);
 });
 
 test("keeps active benchmark prose direct", async () => {
@@ -211,6 +233,7 @@ test("keeps active benchmark prose direct", async () => {
     const page = await source(path);
     assert.doesNotMatch(page, /\bnot (?:just|only|merely)\b/i);
     assert.doesNotMatch(page, /\bit'?s not\b[^.]*\bit'?s\b/i);
+    assert.doesNotMatch(page, /\barticle\b|\bcampaign\b/i);
   }
 });
 
