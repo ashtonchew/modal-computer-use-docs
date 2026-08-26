@@ -18,13 +18,16 @@ description: "Pass a versioned session handle to one explicitly placed Function.
 The handle carries versioned routing identity. Borrow entry resolves fresh access and verifies the
 live target.
 
-## Require exact placement
+## Require verifiable placement
 
-Set the same exact region on the owner configuration and Function decorator. Pass that value to
-`borrow_async(function_region=...)`.
+Set the same supported selector on the owner configuration and Function decorator. Pass that
+selector to `borrow_async(function_region=...)`. Public narrow selectors such as `us-west` can
+resolve to provider-native values such as `us-west-2`, `us-west1`, or `westus3`. A granted
+granular selector such as `us-west-2` must match the observed runtime region exactly.
 
-Missing, broad, mismatched, malformed, or unverifiable placement fails before mutation. The caller
-must establish the placed Function topology explicitly.
+Missing, broad, mismatched, malformed, or unverifiable placement fails before mutation. Broad
+selectors such as `us` and `eu` are invalid for handoff. The caller must establish the placed
+Function topology explicitly.
 
 ## Keep one borrow
 

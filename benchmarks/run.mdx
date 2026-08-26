@@ -36,7 +36,7 @@ Each live script requires an explicit authorization flag, Modal credentials, a c
 | Input-work capacity | `uv run python scripts/run_input_capacity_gate.py --help` |
 | Managed Image lifecycle | `uv run python scripts/run_image_lifecycle_benchmark.py --help` |
 
-Read the [canonical benchmark procedure](https://github.com/ashtonchew/modal-computer-use/blob/1b60dc92e6998598a6db304a4a49de8fd3754b15/docs/benchmarking.md) before a live run. It defines the exact flags, timer boundaries, cost ceiling, cleanup, sanitization, and promotion rules.
+Read the [canonical benchmark procedure](https://github.com/ashtonchew/modal-computer-use/blob/b60c1cb7495200e36a738c0f6e07961b1d2db93c/docs/benchmarking.md) before a live run. It defines the exact flags, timer boundaries, cost ceiling, cleanup, sanitization, and promotion rules.
 
 <Warning>
 Live commands create billable Modal resources. Record an approved cost ceiling. Poll each run to a terminal state. Check the provider console after cleanup.

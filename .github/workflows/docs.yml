@@ -39,7 +39,7 @@ jobs:
 
       - name: Check the released API contract
         run: |
-          python3 -m pip install "modal-computer-use[modal]==2.0.0"
+          python3 -m pip install "modal-computer-use[modal]==2.0.1"
           python3 scripts/check_api_contract.py
 
       - name: Install Vale

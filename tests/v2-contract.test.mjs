@@ -44,6 +44,94 @@ test("publishes 2.x as latest and preserves every 1.x page", async () => {
   assert.deepEqual(legacyNavigation, legacyFiles);
 });
 
+test("publishes the exact v2.0.1 migration and permanent legacy redirect", async () => {
+  const config = JSON.parse(await source("docs.json"));
+  const [latest, previous] = config.navigation.versions;
+  assert.ok(collectPages(latest.tabs).includes("reference/migration-v2"));
+  assert.ok(collectPages(previous.tabs).includes("v1/reference/migration-v2"));
+  assert.deepEqual(
+    config.redirects.find(({ source: path }) => path === "/reference/migration"),
+    {
+      source: "/reference/migration",
+      destination: "/reference/migration-v2",
+      permanent: true,
+    },
+  );
+
+  const migration = await source("reference/migration-v2.mdx");
+  assert.match(migration, /v1\.1\.0 pattern \| v2\.0\.1 default \| Required change/);
+  assert.match(migration, /modal-computer-use==2\.0\.1/);
+  assert.match(migration, /AsyncComputerSandbox\.create/);
+  assert.match(migration, /owner\.session_handle\(\)/);
+  assert.match(migration, /handle\.borrow_async\(\)/);
+  assert.match(migration, /computer\.step\(\)/);
+  assert.match(migration, /computer-step-envelope-v1/);
+  assert.match(migration, /screenshots\.full\(\).*binary HTTP/s);
+  assert.match(migration, /input_rate_limit_per_sec=100/);
+  assert.match(migration, /input_rate_limit_burst=400/);
+  assert.match(migration, /b60c1cb7495200e36a738c0f6e07961b1d2db93c/);
+  assert.match(migration, /\[preserved 1\.x documentation\]\(\/v1\/index\)/);
+
+  const previousMigration = await source("v1/reference/migration-v2.mdx");
+  assert.match(previousMigration, /preserved v1\.1\.0 documentation/);
+  assert.match(previousMigration, /\[v2\.0\.1 migration guide\]\(\/reference\/migration-v2\)/);
+  assert.match(previousMigration, /\[v1\.1\.0 quickstart\]\(\/v1\/start\/quickstart\)/);
+
+  const installation = await source("start/installation.mdx");
+  assert.match(installation, /modal-computer-use\[modal\]==2\.0\.1/);
+  assert.doesNotMatch(installation, /2\.0\.0/);
+
+  const workflow = await source(".github/workflows/docs.yml");
+  assert.match(workflow, /modal-computer-use\[modal\]==2\.0\.1/);
+});
+
+test("documents narrow and granular placement without silent fallback", async () => {
+  const migration = await source("reference/migration-v2.mdx");
+  assert.match(migration, /same requested selector/);
+  assert.match(migration, /public narrow selector such as `us-west`/i);
+  assert.match(migration, /Workspace-granted granular selector such as `us-west-2`/);
+  assert.match(migration, /GCP `us-west1`/);
+  assert.match(migration, /Azure `westus3`/);
+  assert.match(migration, /Broad selectors such as `us` and `eu` fail before allocation/);
+  assert.match(migration, /does not fall back to an external caller/);
+});
+
+test("publishes the weighted input-capacity decision and exact release evidence", async () => {
+  const config = JSON.parse(await source("docs.json"));
+  const [latest, previous] = config.navigation.versions;
+  assert.ok(collectPages(latest.tabs).includes("benchmarks/input-capacity"));
+  assert.ok(collectPages(previous.tabs).includes("v1/benchmarks/input-capacity"));
+
+  const capacity = await source("benchmarks/input-capacity.mdx");
+  assert.match(capacity, /100 normalized input-work tokens per second/);
+  assert.match(capacity, /400-token burst/);
+  assert.match(capacity, /normalized-input-work-v1/);
+  assert.match(capacity, /complete recursive cost.*before any\ndesktop mutation/s);
+  assert.match(capacity, /\| 1 \| 527\.398 .*\| Pass \|/);
+  assert.match(capacity, /\| 2 \| 505\.135 .*\| Pass \|/);
+  assert.match(capacity, /\| 3 \| 380\.704 .*\| Pass \|/);
+  assert.match(capacity, /diagnostic 2,000-token refill and 4,000-token burst/);
+  assert.match(capacity, /at least 200 normalized tokens per second/);
+  assert.match(capacity, /0\.02 aggregate cgroup CPU-seconds per normalized token/);
+  assert.match(capacity, /128 MiB of RSS/);
+  assert.match(capacity, /eee2b9456c76474a5b50a857af899ff11ca70a32/);
+  assert.equal(
+    [...capacity.matchAll(/b60c1cb7495200e36a738c0f6e07961b1d2db93c/g)].length,
+    4,
+  );
+  for (const artifact of [1, 2, 3]) {
+    assert.match(
+      capacity,
+      new RegExp(`benchmark-data/input-capacity-run-${artifact}-2026-08-08\\.json`),
+    );
+  }
+
+  const legacy = await source("v1/benchmarks/input-capacity.mdx");
+  assert.match(legacy, /preserved v1\.1\.0 documentation/);
+  assert.match(legacy, /\[v2\.0\.1 input-capacity result\]\(\/benchmarks\/input-capacity\)/);
+  assert.doesNotMatch(legacy, /normalized-input-work-v1|100-token|400-token/);
+});
+
 test("documents the placed Step path and its measurement boundary", async () => {
   const quickstart = await source("start/quickstart.mdx");
   assert.match(quickstart, /AsyncComputerSandbox\.create/);
@@ -288,7 +376,8 @@ test("documents current defaults and opt-in runtime features", async () => {
   assert.match(image, /ImageReleaseSpec/);
   assert.match(image, /publish_image_release/);
   assert.match(image, /resolve_release_image/);
-  assert.match(image, /4cb098207053931c2e6e693ce87f7f6e16ab215a/);
+  assert.match(image, /b60c1cb7495200e36a738c0f6e07961b1d2db93c/);
+  assert.match(image, /logical_release="2\.0\.1"/);
 
   const gateway = await source("build/run-gateway.mdx");
   assert.match(gateway, /stable run ID/i);

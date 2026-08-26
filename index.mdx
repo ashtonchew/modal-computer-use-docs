@@ -45,7 +45,7 @@ ready and whether the task succeeded.
 ## Keep the trajectory close to the desktop
 
 1. Create the desktop once with an async owner.
-2. Send its session handle to a Function in the same exact region.
+2. Send its session handle to a Function that declares the same supported region selector.
 3. Keep one borrow and one pooled client for the model loop.
 4. Release the borrow before the owner closes the desktop.
 

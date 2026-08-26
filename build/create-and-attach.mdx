@@ -6,15 +6,15 @@ description: "Choose the lifecycle and cleanup contract for one Modal desktop."
 
 ## Create an owner for the primary path
 
-`AsyncComputerSandbox.create()` requires an explicit Modal environment and exact region. It also
-requires an ingress and ownership mode that can produce a session handle. Invalid handoff settings
-fail before Modal allocation.
+`AsyncComputerSandbox.create()` requires an explicit Modal environment and a supported narrow or
+Workspace-granted granular region selector. It also requires an ingress and ownership mode that
+can produce a session handle. Invalid handoff settings fail before Modal allocation.
 
 ```python
 from modal_computer_use import AsyncComputerSandbox, ComputerConfig
 
 config = ComputerConfig(
-    runtime={"modal_environment": "main", "modal_region": "us-west-2"},
+    runtime={"modal_environment": "main", "modal_region": "us-west"},
     resources={"profile": "browser", "cpu": 1.0, "memory_mib": 2048},
     browser={"kind": "chromium"},
 )
@@ -31,7 +31,7 @@ a terminal outcome.
 ```python
 async with handle.borrow_async(
     run_id=run_id,
-    function_region="us-west-2",
+    function_region="us-west",
 ) as computer:
     initial = await computer.screenshots.full()
     step = await computer.step(actions)
