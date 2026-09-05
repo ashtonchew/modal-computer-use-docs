@@ -32,7 +32,11 @@ step = await computer.step(
 | `screenshots` | `full`, `full_bytes`, `region`, `region_bytes`, `zoom`, `zoom_bytes`, `zoom_around` | Capture semantic screenshots or raw bytes |
 | `input` | `release_all` | Release held keys and mouse buttons |
 
-The default inline `screenshots.full()` request uses the raw binary route and returns a byte-backed `Screenshot`. JSON and base64 routes remain available for direct REST and artifact storage.
+The default inline `screenshots.full()` request uses the raw binary route and returns a byte-backed
+`Screenshot`. Artifact and automatic storage use the structured JSON route and return a
+`Screenshot`. See
+[screenshot storage options](/build/screenshots-recordings#choose-screenshot-storage) and
+[artifact retrieval](/build/artifacts-storage#read-a-screenshot-artifact).
 
 ## Ordered action primitives
 
