@@ -64,6 +64,8 @@ def main() -> None:
         "call_id",
     )
 
+    assert mcu.ScreenshotOptions().storage == "inline"
+
     defaults = mcu.ComputerConfig()
     assert defaults.actions.screenshot_capture_source == "mss"
     assert defaults.actions.input_rate_limit_per_sec == 100
@@ -72,7 +74,7 @@ def main() -> None:
     with mcu.ComputerSandbox.local() as computer:
         assert callable(computer.browser.open_url)
         assert callable(computer.mouse.move)
-        assert callable(computer.screenshots.full)
+        require_parameters(computer.screenshots.full, "storage")
         assert callable(computer.artifacts.download)
         assert callable(computer.actions.run)
 

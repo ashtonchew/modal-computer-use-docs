@@ -21,7 +21,20 @@ still returns a semantic `Screenshot`. The SDK validates the body, format, dimen
 digest, timestamp, coordinate space, cursor state, timing, and capture backend.
 
 Use `full_bytes()` when a low-level caller only needs encoded bytes. JSON and base64 routes remain
-available for REST and compatibility clients. Artifact storage keeps its structured response.
+available for REST and compatibility clients.
+
+## Choose screenshot storage
+
+Set `storage` when you call `screenshots.full()`.
+
+| Storage | Result |
+| --- | --- |
+| `inline` | Returns the image bytes in the `Screenshot`. This is the default. |
+| `artifact` | Saves the encoded image and returns its `artifact_uri` with screenshot metadata. |
+| `auto` | Uses an artifact above 1,000,000 encoded image bytes. At or below 1,000,000 bytes, the image stays inline. |
+
+Artifact and automatic storage use the structured JSON response. Read saved images through the
+[artifact namespace](/build/artifacts-storage#read-a-screenshot-artifact).
 
 ## Use the step frame after actions
 
