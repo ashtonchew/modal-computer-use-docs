@@ -60,7 +60,7 @@ test("publishes the exact v2.0.1 migration and permanent legacy redirect", async
 
   const migration = await source("reference/migration-v2.mdx");
   assert.match(migration, /v1\.1\.0 pattern \| v2\.0\.1 default \| Required change/);
-  assert.match(migration, /modal-computer-use==2\.0\.1/);
+  assert.match(migration, /modal-computer-use==2\.0\.2/);
   assert.match(migration, /AsyncComputerSandbox\.create/);
   assert.match(migration, /owner\.session_handle\(\)/);
   assert.match(migration, /handle\.borrow_async\(\)/);
@@ -78,11 +78,11 @@ test("publishes the exact v2.0.1 migration and permanent legacy redirect", async
   assert.match(previousMigration, /\[v1\.1\.0 quickstart\]\(\/v1\/start\/quickstart\)/);
 
   const installation = await source("start/installation.mdx");
-  assert.match(installation, /modal-computer-use\[modal\]==2\.0\.1/);
+  assert.match(installation, /modal-computer-use\[modal\]==2\.0\.2/);
   assert.doesNotMatch(installation, /2\.0\.0/);
 
   const workflow = await source(".github/workflows/docs.yml");
-  assert.match(workflow, /modal-computer-use\[modal\]==2\.0\.1/);
+  assert.match(workflow, /modal-computer-use\[modal\]==2\.0\.2/);
 });
 
 test("documents narrow and granular placement without silent fallback", async () => {
@@ -376,8 +376,8 @@ test("documents current defaults and opt-in runtime features", async () => {
   assert.match(image, /ImageReleaseSpec/);
   assert.match(image, /publish_image_release/);
   assert.match(image, /resolve_release_image/);
-  assert.match(image, /b60c1cb7495200e36a738c0f6e07961b1d2db93c/);
-  assert.match(image, /logical_release="2\.0\.1"/);
+  assert.match(image, /3fb4e2a4a58f5fae235515429c9219f4d964132d/);
+  assert.match(image, /logical_release="2\.0\.2"/);
 
   const gateway = await source("build/run-gateway.mdx");
   assert.match(gateway, /stable run ID/i);

@@ -4,7 +4,7 @@ title: "OpenAPI reference"
 description: "Use and verify the checked-in OpenAPI 3.1 schema."
 ---
 
-The daemon publishes an OpenAPI 3.1 contract. The checked-in schema reports package version `2.0.1`.
+The daemon publishes an OpenAPI 3.1 contract. The checked-in schema reports package version `2.0.2`.
 
 ## Verify the schema
 
@@ -12,7 +12,7 @@ The daemon publishes an OpenAPI 3.1 contract. The checked-in schema reports pack
 uv run python scripts/export_openapi.py --check
 ```
 
-The command fails when [`docs/openapi.json`](https://github.com/ashtonchew/modal-computer-use/blob/b60c1cb7495200e36a738c0f6e07961b1d2db93c/docs/openapi.json) differs from the daemon application.
+The command fails when [`docs/openapi.json`](https://github.com/ashtonchew/modal-computer-use/blob/v2.0.2/docs/openapi.json) differs from the daemon application.
 
 ## Main route groups
 
